@@ -41,10 +41,14 @@ async function initStripe() {
 
     log('Setting up managed webhook...', 'stripe');
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`
-    );
-    log(`Webhook configured: ${webhook.url}`, 'stripe');
+    try {
+      const result = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`
+      );
+      log(`Webhook configured: ${result?.webhook?.url || 'ready'}`, 'stripe');
+    } catch (webhookErr: any) {
+      log(`Webhook setup warning: ${webhookErr.message} - continuing without managed webhook`, 'stripe');
+    }
 
     log('Syncing Stripe data...', 'stripe');
     stripeSync.syncBackfill()

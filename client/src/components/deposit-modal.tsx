@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
+
+const PLATFORM_FEE = 1.5;
+const EXCHANGE_RATE = 5.0;
 
 const PROCESS_STAGES = [
   { id: 1, label: "Detecting PIX Deposit", icon: Banknote },
@@ -25,9 +28,14 @@ export function DepositModal() {
   const [currentStage, setCurrentStage] = useState(0);
   const [pixKey, setPixKey] = useState("");
   const [txId, setTxId] = useState<string | null>(null);
+  const [feeInfo, setFeeInfo] = useState<{ feeUsd: string; netUsd: string } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  const grossUsd = amount ? parseFloat(amount) / EXCHANGE_RATE : 0;
+  const feeUsd = grossUsd * (PLATFORM_FEE / 100);
+  const netUsd = grossUsd - feeUsd;
 
   const handleGeneratePix = async () => {
     if (!user) return;
@@ -39,6 +47,9 @@ export function DepositModal() {
       const data = await res.json();
       setPixKey(data.pixKey);
       setTxId(data.transaction.id);
+      if (data.fee) {
+        setFeeInfo({ feeUsd: data.fee.amountUsd, netUsd: data.fee.netUsd });
+      }
       setStep("qrcode");
     } catch (err: any) {
       toast({ title: "Error", description: "Failed to generate PIX code", variant: "destructive" });
@@ -51,38 +62,37 @@ export function DepositModal() {
     setTimeout(() => setStep("processing"), 2000);
   };
 
-  const processStage = useCallback(async () => {
-    if (!txId) return;
-    try {
-      const res = await apiRequest("POST", `/api/transactions/${txId}/process`, {});
-      const data = await res.json();
-      if (data.completed) {
-        setCurrentStage(3);
-        setTimeout(() => {
-          setStep("success");
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard", user?.id] });
-          queryClient.invalidateQueries({ queryKey: ["/api/transactions", user?.id] });
-          queryClient.invalidateQueries({ queryKey: ["/api/investments", user?.id] });
-        }, 1000);
-      }
-    } catch {}
-  }, [txId, queryClient]);
-
   useEffect(() => {
-    if (step === "processing" && txId) {
-      const interval = setInterval(() => {
-        setCurrentStage((prev) => {
-          if (prev >= PROCESS_STAGES.length - 1) {
-            clearInterval(interval);
-            return prev;
-          }
-          processStage();
-          return prev + 1;
-        });
-      }, 2500);
-      return () => clearInterval(interval);
+    if (step !== "processing" || !txId) return;
+
+    let cancelled = false;
+
+    async function runPipeline() {
+      for (let stage = 0; stage < PROCESS_STAGES.length; stage++) {
+        if (cancelled) return;
+        setCurrentStage(stage);
+
+        try {
+          await apiRequest("POST", `/api/transactions/${txId}/process`, {});
+        } catch {}
+
+        if (stage < PROCESS_STAGES.length - 1) {
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+      }
+
+      if (cancelled) return;
+
+      await new Promise((r) => setTimeout(r, 1000));
+      setStep("success");
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investments", user?.id] });
     }
-  }, [step, txId, processStage]);
+
+    runPipeline();
+    return () => { cancelled = true; };
+  }, [step, txId, queryClient, user?.id]);
 
   const reset = () => {
     setIsOpen(false);
@@ -92,8 +102,12 @@ export function DepositModal() {
       setCurrentStage(0);
       setTxId(null);
       setPixKey("");
+      setFeeInfo(null);
     }, 500);
   };
+
+  const displayNetUsd = feeInfo?.netUsd || netUsd.toFixed(2);
+  const displayFeeUsd = feeInfo?.feeUsd || feeUsd.toFixed(2);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -128,8 +142,16 @@ export function DepositModal() {
                 </div>
                 <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Est. USD Value</span>
-                    <span className="font-mono font-medium" data-testid="text-usd-value">${amount ? (parseFloat(amount) / 5.0).toFixed(2) : "0.00"}</span>
+                    <span className="text-muted-foreground">Gross USD Value</span>
+                    <span className="font-mono font-medium">${grossUsd.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Platform Fee ({PLATFORM_FEE}%)</span>
+                    <span className="font-mono text-yellow-500">-${feeUsd.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
+                    <span className="text-muted-foreground">Net Staked Amount</span>
+                    <span className="font-mono font-bold text-primary" data-testid="text-usd-value">${netUsd.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Est. APY</span>
@@ -153,6 +175,7 @@ export function DepositModal() {
                 <div className="text-center space-y-1">
                   <p className="text-sm text-muted-foreground">Pay with your banking app</p>
                   <p className="text-2xl font-display font-bold" data-testid="text-pix-amount">R$ {parseFloat(amount).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Fee: ${displayFeeUsd} | Staked: ${displayNetUsd}</p>
                 </div>
                 <Button variant="outline" className="w-full h-12 border-primary/20 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer" onClick={handleCopyPix} data-testid="button-copy-pix">
                   Copy PIX Code
@@ -198,7 +221,11 @@ export function DepositModal() {
                 <div className="w-full bg-white/5 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Staked Amount</span>
-                    <span className="font-mono text-white">${(parseFloat(amount) / 5.0).toFixed(2)} USDT</span>
+                    <span className="font-mono text-white">${displayNetUsd} USDT</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Platform Fee</span>
+                    <span className="font-mono text-yellow-500">${displayFeeUsd}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Protocol</span>

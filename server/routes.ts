@@ -3,8 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSchema, insertTransactionSchema, insertInvestmentSchema } from "@shared/schema";
 import { z } from "zod";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 
 const EXCHANGE_RATE = 5.0; // BRL to USD
+const PLATFORM_FEE_PERCENT = 1.5; // 1.5% fee on deposits
 
 const PLANS = [
   { id: "plan-3", duration: "3 Months", apy: 8.5, risk: "Low", min: 50 },
@@ -205,30 +207,100 @@ export async function registerRoutes(
     }
   });
 
+  // ============ STRIPE CONFIG ============
+  app.get("/api/stripe/config", async (_req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      return res.json({ publishableKey });
+    } catch (e: any) {
+      return res.status(500).json({ message: "Stripe not configured" });
+    }
+  });
+
+  // Create payment intent for platform fee
+  app.post("/api/stripe/create-fee-payment", async (req, res) => {
+    try {
+      const { userId, amountBrl } = req.body;
+      if (!userId || !amountBrl) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          metadata: { userId, username: user.username },
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId);
+      }
+
+      const amountUsd = parseFloat(amountBrl) / EXCHANGE_RATE;
+      const feeUsd = amountUsd * (PLATFORM_FEE_PERCENT / 100);
+      const feeInCents = Math.round(feeUsd * 100);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.max(feeInCents, 50),
+        currency: "usd",
+        customer: customerId,
+        metadata: {
+          userId,
+          depositAmountBrl: amountBrl,
+          depositAmountUsd: amountUsd.toFixed(2),
+          feePercent: PLATFORM_FEE_PERCENT.toString(),
+          type: "platform_fee",
+        },
+        automatic_payment_methods: { enabled: true },
+      });
+
+      return res.json({
+        clientSecret: paymentIntent.client_secret,
+        feeUsd: feeUsd.toFixed(2),
+        feePercent: PLATFORM_FEE_PERCENT,
+        netAmountUsd: (amountUsd - feeUsd).toFixed(2),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
   // ============ DEPOSIT FLOW (PIX) ============
   app.post("/api/deposit", async (req, res) => {
     try {
-      const { userId, amountBrl } = req.body;
+      const { userId, amountBrl, feeCharged } = req.body;
       if (!userId || !amountBrl || parseFloat(amountBrl) < 50) {
         return res.status(400).json({ message: "Invalid deposit. Minimum R$ 50.00" });
       }
 
-      const amountUsd = (parseFloat(amountBrl) / EXCHANGE_RATE).toFixed(2);
+      const grossUsd = parseFloat(amountBrl) / EXCHANGE_RATE;
+      const feeUsd = grossUsd * (PLATFORM_FEE_PERCENT / 100);
+      const netUsd = (grossUsd - feeUsd).toFixed(2);
 
       const tx = await storage.createTransaction({
         userId,
         type: "deposit",
         amountBrl: amountBrl.toString(),
-        amountUsd,
+        amountUsd: netUsd,
         status: "pending",
         protocol: "Aave V3",
-        details: "PIX → DPIX → USDT (Liquid) → USDT (Optimism) → Stake",
+        details: `PIX → DPIX → USDT → Stake (fee: ${PLATFORM_FEE_PERCENT}% = $${feeUsd.toFixed(2)})`,
         stage: 0,
       });
 
       const pixKey = `00020126580014br.gov.bcb.pix0136${tx.id.slice(0, 36)}5204000053039865802BR5913DEFI DIRECT6008SAO PAULO62070503***6304`;
 
-      return res.status(201).json({ transaction: tx, pixKey });
+      return res.status(201).json({
+        transaction: tx,
+        pixKey,
+        fee: {
+          percent: PLATFORM_FEE_PERCENT,
+          amountUsd: feeUsd.toFixed(2),
+          netUsd,
+        },
+      });
     } catch (e: any) {
       return res.status(500).json({ message: e.message });
     }
