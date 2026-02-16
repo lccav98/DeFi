@@ -73,8 +73,9 @@ shared/           # Shared code between client and server
 ### Key Design Decisions
 1. **Storage Interface Pattern**: `IStorage` interface in `storage.ts` abstracts data access, making it possible to swap implementations (e.g., for testing)
 2. **Shared Schema**: Database schema lives in `shared/` so both client and server can import types
-3. **Simulated DeFi Pipeline**: The deposit flow simulates a multi-stage process (PIX detection → DPIX minting → cross-chain bridge → staking) with stage tracking, but actual blockchain integrations are not yet implemented
-4. **No Real Auth Security**: Current auth is minimal (plain text passwords, localStorage tokens) — suitable for prototype only
+3. **Real Blockchain Pipeline**: The deposit flow executes real on-chain operations when configured (PIX detection → DPIX mint → cross-chain bridge → Aave V3 staking), recording transaction hashes at each step. Falls back to simulated mode when blockchain env vars are not set.
+4. **On-Chain Transparency**: Every pipeline stage records a verifiable transaction hash displayed as clickable Etherscan links throughout the UI (deposit modal, transactions page, investments page, withdraw modal)
+5. **No Real Auth Security**: Current auth is minimal (plain text passwords, localStorage tokens) — suitable for prototype only
 
 ## External Dependencies
 
@@ -100,10 +101,21 @@ shared/           # Shared code between client and server
 - **Coverage**: All pages, modals, navigation, and user-facing text use `t()` translation function
 - **Switcher**: Available in layout sidebar and auth page (globe icon dropdown)
 
-### Planned Integrations (from requirements, not yet implemented)
-- PIX payment gateway for BRL on-ramp
-- SideShift.ai or similar bridge API for cross-chain transfers
-- DeFi protocol smart contract integration (yield farming/staking)
+### Blockchain Integration (Implemented)
+- **Library**: ethers.js v6 for EVM interaction
+- **Networks**: Optimism mainnet (chainId 10) or Sepolia testnet (chainId 11155420), controlled by `BLOCKCHAIN_NETWORK` env var
+- **Aave V3 Pool**: 0x794a61358D6845594F94dc1DB02A252b5b4814aD (supply/withdraw USDT)
+- **USDT on Optimism**: 0x94b008aA00579c1307B0EF2c499aD98a8ce58e58
+- **Pipeline Stages**: PIX detection → DPIX mint (on-chain receipt) → cross-chain bridge → Aave V3 staking
+- **Fallback**: System runs in simulated mode when `PLATFORM_WALLET_PRIVATE_KEY` is not set
+- **Env Vars**:
+  - `PLATFORM_WALLET_PRIVATE_KEY` (secret) - Wallet private key for on-chain operations
+  - `OPTIMISM_RPC_URL` (optional) - Custom RPC endpoint; defaults to public Optimism RPC
+  - `BLOCKCHAIN_NETWORK` (optional) - "mainnet" or "testnet"; defaults to "mainnet"
+- **Code Location**: `server/blockchain/` directory (config.ts, provider.ts, abis.ts, aaveService.ts, dpixService.ts, pipeline.ts)
+
+### Planned Integrations (not yet implemented)
+- PIX payment gateway for BRL on-ramp (currently simulated)
+- SideShift.ai or similar bridge API for cross-chain transfers (currently simulated bridge step)
 - Embedded non-custodial wallet (WalletConnect or similar)
-- Ethers.js/Wagmi for EVM chain interaction
 - Liquid Network libraries for Bitcoin sidechain operations
