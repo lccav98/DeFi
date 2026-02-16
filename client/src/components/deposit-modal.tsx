@@ -131,6 +131,9 @@ export function DepositModal() {
         const { error } = await (stripe as any).confirmPixPayment(data.clientSecret, {
           payment_method: {
             pix: {},
+            billing_details: {
+              name: user.displayName || user.username,
+            },
           },
           return_url: window.location.href,
         });
