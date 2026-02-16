@@ -1,0 +1,27 @@
+Prompt Profissional para Desenvolvimento de Aplicação DeFi "All-in-One"
+Contexto: Atue como um Arquiteto de Software Sênior e Gerente de Produto de Fintech. O objetivo é desenvolver uma aplicação (Mobile e Web) que simplifique a entrada de capital fiat (BRL/PIX) para o ecossistema DeFi, eliminando a necessidade de o usuário interagir manualmente com múltiplas corretoras, bridges e carteiras.
+Objetivo do Produto: Criar uma plataforma unificada que automatize o fluxo: PIX → Stablecoin (USDT) → Protocolo de Investimento (Yield Farming), mantendo a privacidade do usuário (No-KYC) e abstraindo a complexidade técnica das trocas de rede (Cross-Chain).
+Requisitos Funcionais Detalhados:
+1. Gateway de Entrada (On-Ramp) Simplificado:
+    ◦ O sistema deve gerar chaves PIX para o usuário depositar Reais.
+    ◦ Automação: Ao detectar o depósito via PIX, o sistema deve converter automaticamente para DPIX e, subsequentemente, para USDT na rede Liquid (ou rede de entrada equivalente), sem intervenção manual.
+    ◦ Requisito Crítico: Permitir a funcionalidade sem exigência de KYC (envio de documentos), conforme a proposta de valor de privacidade citada nas fontes.
+2. Bridge Cross-Chain Invisível (Backend):
+    ◦ Integrar via API serviços de bridge (como a SideShift.ai mencionada na referência) para transportar os fundos automaticamente.
+    ◦ Fluxo: O app deve detectar o saldo em USDT (Rede Liquid) e executar a troca para USDT (Rede EVM/BSC/Arbitrum) automaticamente no backend.
+    ◦ O usuário não deve precisar copiar e colar endereços de carteiras manualmente entre redes diferentes; o app deve gerenciar os endereços de depósito e destino internamente.
+3. Abstração de Taxas de Gás (Gas Management):
+    ◦ O usuário não deve precisar manter saldos de tokens nativos (como LBTC para Liquid ou BNB para BSC) para pagar taxas.
+    ◦ Solução: Implementar um mecanismo de "Meta-transações" ou descontar as taxas de gás diretamente do montante principal do USDT transacionado, garantindo que a transação nunca falhe por "falta de gás".
+4. Integração DeFi Nativa (SwapM Integration):
+    ◦ Conectar diretamente à API/Smart Contracts da plataforma de investimento alvo (ex: SwapM).
+    ◦ Apresentar no dashboard do usuário apenas as opções de investimento (Planos de 3, 6, 12 meses e APY estimado).
+    ◦ Botão de "Investir Agora" que utiliza o saldo já convertido e "bridged" para assinar o contrato inteligente de staking automaticamente.
+5. Interface de Usuário (UX/UI):
+    ◦ Dashboard Unificado: Mostrar saldo total, rendimentos passivos acumulados e status das transações (de PIX até o Staking) em uma única tela.
+    ◦ Eliminar a necessidade de alternar entre apps (Carteira, Site da Bridge, Site de Investimento).
+Stack Tecnológico Sugerido:
+• Frontend: React Native ou Flutter (para mobile), React.js (Web).
+• Web3: Ethers.js / Wagmi para interação com contratos EVM e bibliotecas específicas para a Liquid Network.
+• Segurança: Integração com WalletConnect ou carteira não-custodial embutida (Embedded Wallet) para que o usuário mantenha a posse das chaves, mas com a UX simplificada.
+Critérios de Sucesso: O usuário deve ser capaz de enviar um PIX e, em menos de 10 minutos, ver seu saldo aplicado em um contrato de rendimento em Dólar, sem ter precisado configurar redes RPC, comprar tokens de gás ou copiar endereços de carteira.
