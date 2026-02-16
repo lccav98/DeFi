@@ -54,6 +54,14 @@
 
   --font-sans: 'Inter', sans-serif;
   --font-display: 'Space Grotesk', sans-serif;
+
+  --animate-gradient: gradient 8s ease infinite;
+
+  @keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 }
 
 @layer base {
@@ -104,10 +112,6 @@
     --sidebar-border: 217 33% 20%;
     --sidebar-ring: 160 84% 39%;
   }
-
-  /* Force Dark Mode styles even without .dark class if we want that permanent look */
-  /* But standard shadcn uses .dark class, so we keep variables in :root for now */
-  /* If the user wants "always dark", we can apply a dark class to html/body */
 }
 
 @layer base {
@@ -150,14 +154,4 @@
   ::-webkit-scrollbar-thumb {
     @apply bg-white/10 rounded-full hover:bg-white/20;
   }
-}
-
-@keyframes gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient {
-  animation: gradient 8s ease infinite;
 }
