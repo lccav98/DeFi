@@ -133,6 +133,7 @@ export function DepositModal() {
             pix: {},
             billing_details: {
               name: user.displayName || user.username,
+              email: `${user.username}@defidirect.app`,
             },
           },
           return_url: window.location.href,
