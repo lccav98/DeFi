@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email"),
   displayName: text("display_name"),
+  stripeCustomerId: text("stripe_customer_id"),
 });
 
 export const transactions = pgTable("transactions", {

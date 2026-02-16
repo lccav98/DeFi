@@ -24,6 +24,8 @@ export interface IStorage {
   deactivateInvestment(id: string): Promise<Investment | undefined>;
   withdrawInvestment(investmentId: string, txData: InsertTransaction): Promise<{ investment: Investment; transaction: Transaction }>;
 
+  updateUserStripeInfo(userId: string, stripeCustomerId: string): Promise<User | undefined>;
+
   getDashboardStats(userId: string): Promise<{
     totalPortfolioValue: number;
     totalDeposited: number;
@@ -107,6 +109,11 @@ export class DatabaseStorage implements IStorage {
 
       return { investment: updatedInv, transaction: createdTx };
     });
+  }
+
+  async updateUserStripeInfo(userId: string, stripeCustomerId: string): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ stripeCustomerId }).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
   async getDashboardStats(userId: string): Promise<{
