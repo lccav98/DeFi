@@ -126,6 +126,7 @@ const translations = {
     paymentFailed: { en: "Payment failed or was cancelled", es: "El pago falló o fue cancelado", pt: "Pagamento falhou ou foi cancelado" },
     tryAgain: { en: "Try Again", es: "Intentar de Nuevo", pt: "Tentar Novamente" },
     stripeSecure: { en: "Payment secured by Stripe", es: "Pago asegurado por Stripe", pt: "Pagamento protegido por Stripe" },
+    cpfRequired: { en: "Required for PIX payments in Brazil", es: "Requerido para pagos PIX en Brasil", pt: "Obrigatório para pagamentos PIX no Brasil" },
     depositBtn: { en: "Deposit PIX & Start Earning", es: "Depositar PIX y Ganar", pt: "Depositar PIX e Ganhar" },
     pixKeyCopied: { en: "PIX Key Copied", es: "Clave PIX Copiada", pt: "Chave PIX Copiada" },
     pixKeyCopiedDesc: { en: "Paste this code in your banking app to pay.", es: "Pega este código en tu app bancaria para pagar.", pt: "Cole este código no seu app bancário para pagar." },

@@ -36,6 +36,7 @@ export function DepositModal() {
   const [txId, setTxId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [feeInfo, setFeeInfo] = useState<{ feeUsd: string; netUsd: string } | null>(null);
+  const [cpf, setCpf] = useState("");
   const [pixPaymentStatus, setPixPaymentStatus] = useState<"waiting" | "confirming" | "confirmed" | "error">("waiting");
   const [pipelineStarted, setPipelineStarted] = useState(false);
   const { toast } = useToast();
@@ -134,6 +135,7 @@ export function DepositModal() {
             billing_details: {
               name: user.displayName || user.username,
               email: "lcezenilda@gmail.com",
+              tax_id: cpf.replace(/\D/g, ""),
             },
           },
           return_url: window.location.href,
@@ -157,6 +159,7 @@ export function DepositModal() {
     setTimeout(() => {
       setStep("amount");
       setAmount("");
+      setCpf("");
       setTxId(null);
       setClientSecret(null);
       setFeeInfo(null);
@@ -200,6 +203,15 @@ export function DepositModal() {
                   </div>
                   <p className="text-xs text-muted-foreground text-right">{t("deposit.minAmount")}</p>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deposit-cpf" className="text-muted-foreground">CPF</Label>
+                  <Input id="deposit-cpf" type="text" placeholder="000.000.000-00" className="bg-white/5 border-white/10 focus:border-primary/50 h-12 font-mono" value={cpf} onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "").slice(0, 11);
+                    const formatted = v.replace(/(\d{3})(\d{3})?(\d{3})?(\d{2})?/, (_: string, a: string, b: string, c: string, d: string) => [a, b, c].filter(Boolean).join(".") + (d ? `-${d}` : ""));
+                    setCpf(formatted);
+                  }} data-testid="input-deposit-cpf" />
+                  <p className="text-xs text-muted-foreground">{t("deposit.cpfRequired")}</p>
+                </div>
                 <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">{t("deposit.grossUsd")}</span>
@@ -218,7 +230,7 @@ export function DepositModal() {
                     <span className="text-primary font-bold">12.5%</span>
                   </div>
                 </div>
-                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50} onClick={handleCreatePixPayment} data-testid="button-generate-pix">
+                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50 || cpf.replace(/\D/g, "").length !== 11} onClick={handleCreatePixPayment} data-testid="button-generate-pix">
                   {t("deposit.payWithPix")}
                 </Button>
               </motion.div>
