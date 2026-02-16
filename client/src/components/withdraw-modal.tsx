@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Loader2, AlertTriangle, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, AlertTriangle, ArrowRight, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Investment } from "@shared/schema";
 import { useTranslation } from "@/lib/i18n";
+import { TxHashLink } from "@/components/tx-hash-link";
 
 const WITHDRAWAL_FEE = 0.02;
 
@@ -179,6 +180,20 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
                     <span className="font-mono text-muted-foreground">${summary?.feeUsd || fee.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {summary?.unstakeTxHash && (
+                  <div className="w-full bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      {t("blockchain.onChainProof")}
+                    </div>
+                    <TxHashLink txHash={summary.unstakeTxHash} explorerBaseUrl={summary.explorerBaseUrl} label={t("blockchain.unstakeProof")} />
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3" />
+                      {t("blockchain.verifyYourself")} Etherscan
+                    </p>
+                  </div>
+                )}
                 <Button onClick={handleClose} className="w-full h-12 font-bold bg-white/10 hover:bg-white/20 cursor-pointer" data-testid="button-close-withdraw">
                   {t("withdraw.returnInvestments")}
                 </Button>

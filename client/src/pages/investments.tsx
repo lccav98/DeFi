@@ -3,13 +3,14 @@ import Layout from "@/components/layout";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Check, Shield, ArrowUpRight, Loader2, ArrowDownLeft } from "lucide-react";
+import { Check, Shield, ArrowUpRight, Loader2, ArrowDownLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Investment } from "@shared/schema";
 import { WithdrawModal } from "@/components/withdraw-modal";
 import { useTranslation } from "@/lib/i18n";
+import { TxHashLink } from "@/components/tx-hash-link";
 
 export default function InvestmentsPage() {
   const { user } = useAuth();
@@ -58,6 +59,7 @@ export default function InvestmentsPage() {
                   <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.autoCompound")}</span></li>
                   <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.noGasFees")}</span></li>
                   <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.instantWithdraw")}</span></li>
+                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("blockchain.transparencyDesc")}</span></li>
                 </ul>
                 <Button className={cn("w-full h-14 text-lg font-bold rounded-xl transition-all cursor-pointer", plan.recommended ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(16,185,129,0.3)]" : "bg-white/5 hover:bg-white/10 text-white border border-white/10")}>
                   {t("investments.startInvesting")}
@@ -70,11 +72,12 @@ export default function InvestmentsPage() {
         <section className="mt-12">
           <h2 className="text-2xl font-display font-bold mb-6">{t("investments.activePositions")}</h2>
           <Card className="glass-panel border-white/5 overflow-hidden">
-            <div className="hidden md:grid grid-cols-5 gap-4 p-6 border-b border-white/5 bg-white/5 font-medium text-sm text-muted-foreground">
+            <div className="hidden md:grid grid-cols-6 gap-4 p-6 border-b border-white/5 bg-white/5 font-medium text-sm text-muted-foreground">
               <div>{t("investments.assetProtocol")}</div>
               <div>{t("investments.amountStaked")}</div>
               <div>{t("investments.currentValue")}</div>
               <div>{t("investments.apyYield")}</div>
+              <div>{t("blockchain.onChainProof")}</div>
               <div>{t("investments.actions")}</div>
             </div>
             {isLoading ? (
@@ -88,13 +91,17 @@ export default function InvestmentsPage() {
               <div className="divide-y divide-white/5">
                 {activeInvestments.map((inv) => {
                   const gain = parseFloat(inv.currentValue) - parseFloat(inv.amountUsd);
+                  const explorerBase = inv.chainId === 10
+                    ? "https://optimistic.etherscan.io"
+                    : "https://sepolia-optimism.etherscan.io";
+
                   return (
-                    <div key={inv.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-6 hover:bg-white/5 transition-colors items-center" data-testid={`row-investment-${inv.id}`}>
+                    <div key={inv.id} className="grid grid-cols-1 md:grid-cols-6 gap-4 p-6 hover:bg-white/5 transition-colors items-center" data-testid={`row-investment-${inv.id}`}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">A</div>
                         <div>
                           <p className="font-bold text-white">{inv.protocol}</p>
-                          <p className="text-xs text-muted-foreground">{inv.network} {t("investments.network")}</p>
+                          <p className="text-xs text-muted-foreground">{inv.network}</p>
                         </div>
                       </div>
                       <div>
@@ -109,6 +116,27 @@ export default function InvestmentsPage() {
                         <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-bold border border-primary/20">
                           {inv.apy}% APY
                         </div>
+                      </div>
+                      <div className="space-y-1">
+                        {inv.stakeTxHash ? (
+                          <TxHashLink txHash={inv.stakeTxHash} explorerBaseUrl={explorerBase} label="Stake" />
+                        ) : (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Shield className="w-3 h-3" />
+                            {inv.chainId ? t("blockchain.verified") : t("blockchain.simulatedMode")}
+                          </span>
+                        )}
+                        {inv.aavePositionId && inv.aavePositionId !== "0x0000000000000000000000000000000000000000" && (
+                          <a
+                            href={`${explorerBase}/address/${inv.aavePositionId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Vault
+                          </a>
+                        )}
                       </div>
                       <div>
                         <Button
@@ -135,26 +163,36 @@ export default function InvestmentsPage() {
             <h2 className="text-xl font-display font-bold mb-4 text-muted-foreground">{t("investments.closedPositions")}</h2>
             <Card className="glass-panel border-white/5 overflow-hidden opacity-60">
               <div className="divide-y divide-white/5">
-                {inactiveInvestments.map((inv) => (
-                  <div key={inv.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 items-center">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-muted-foreground font-bold">A</div>
-                      <div>
-                        <p className="font-medium text-muted-foreground">{inv.protocol}</p>
-                        <p className="text-xs text-muted-foreground">{inv.network} {t("investments.network")}</p>
+                {inactiveInvestments.map((inv) => {
+                  const explorerBase = inv.chainId === 10
+                    ? "https://optimistic.etherscan.io"
+                    : "https://sepolia-optimism.etherscan.io";
+
+                  return (
+                    <div key={inv.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-6 items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-muted-foreground font-bold">A</div>
+                        <div>
+                          <p className="font-medium text-muted-foreground">{inv.protocol}</p>
+                          <p className="text-xs text-muted-foreground">{inv.network}</p>
+                        </div>
                       </div>
+                      <div>
+                        <p className="font-mono text-muted-foreground">${parseFloat(inv.amountUsd).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="font-mono text-muted-foreground">${parseFloat(inv.currentValue).toFixed(2)}</p>
+                      </div>
+                      <div className="space-y-1">
+                        {inv.unstakeTxHash && (
+                          <TxHashLink txHash={inv.unstakeTxHash} explorerBaseUrl={explorerBase} label="Unstake" compact />
+                        )}
+                        <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground border border-white/5">{t("investments.withdrawn")}</span>
+                      </div>
+                      <div />
                     </div>
-                    <div>
-                      <p className="font-mono text-muted-foreground">${parseFloat(inv.amountUsd).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="font-mono text-muted-foreground">${parseFloat(inv.currentValue).toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground border border-white/5">{t("investments.withdrawn")}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           </section>

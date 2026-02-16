@@ -3,14 +3,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, QrCode, CheckCircle2, Loader2, Wallet, ShieldCheck, Banknote } from "lucide-react";
+import { ArrowRight, QrCode, CheckCircle2, Loader2, Wallet, ShieldCheck, Banknote, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n";
+import { TxHashLink } from "@/components/tx-hash-link";
 
 const PLATFORM_FEE = 1.5;
 const EXCHANGE_RATE = 5.0;
@@ -19,10 +20,10 @@ export function DepositModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"amount" | "qrcode" | "processing" | "success">("amount");
   const [amount, setAmount] = useState("");
-  const [currentStage, setCurrentStage] = useState(0);
   const [pixKey, setPixKey] = useState("");
   const [txId, setTxId] = useState<string | null>(null);
   const [feeInfo, setFeeInfo] = useState<{ feeUsd: string; netUsd: string } | null>(null);
+  const [pipelineStarted, setPipelineStarted] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -38,6 +39,33 @@ export function DepositModal() {
   const grossUsd = amount ? parseFloat(amount) / EXCHANGE_RATE : 0;
   const feeUsd = grossUsd * (PLATFORM_FEE / 100);
   const netUsd = grossUsd - feeUsd;
+
+  const { data: txStatus } = useQuery<{
+    stage: number;
+    status: string;
+    mintTxHash: string | null;
+    bridgeTxHash: string | null;
+    stakeTxHash: string | null;
+    explorerBaseUrl: string | null;
+    txLinks: { mint: string | null; bridge: string | null; stake: string | null };
+  }>({
+    queryKey: ["/api/transactions", txId, "status"],
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${txId}/status`);
+      return res.json();
+    },
+    enabled: !!txId && (step === "processing" || step === "success"),
+    refetchInterval: step === "processing" ? 2000 : false,
+  });
+
+  useEffect(() => {
+    if (txStatus?.status === "completed" && step === "processing") {
+      setStep("success");
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/investments", user?.id] });
+    }
+  }, [txStatus, step, queryClient, user?.id]);
 
   const handleGeneratePix = async () => {
     if (!user) return;
@@ -58,58 +86,42 @@ export function DepositModal() {
     }
   };
 
-  const handleCopyPix = () => {
+  const handleCopyPix = async () => {
     navigator.clipboard.writeText(pixKey);
     toast({ title: t("deposit.pixKeyCopied"), description: t("deposit.pixKeyCopiedDesc") });
-    setTimeout(() => setStep("processing"), 2000);
-  };
 
-  useEffect(() => {
-    if (step !== "processing" || !txId) return;
+    setStep("processing");
 
-    let cancelled = false;
-
-    async function runPipeline() {
-      for (let stage = 0; stage < 4; stage++) {
-        if (cancelled) return;
-        setCurrentStage(stage);
-
-        try {
-          await apiRequest("POST", `/api/transactions/${txId}/process`, {});
-        } catch {}
-
-        if (stage < 3) {
-          await new Promise((r) => setTimeout(r, 2500));
+    if (txId && !pipelineStarted) {
+      setPipelineStarted(true);
+      try {
+        await apiRequest("POST", `/api/deposit/${txId}/execute-pipeline`, {});
+      } catch {
+        for (let stage = 0; stage < 4; stage++) {
+          try {
+            await apiRequest("POST", `/api/transactions/${txId}/process`, {});
+          } catch {}
+          if (stage < 3) await new Promise((r) => setTimeout(r, 2500));
         }
       }
-
-      if (cancelled) return;
-
-      await new Promise((r) => setTimeout(r, 1000));
-      setStep("success");
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/investments", user?.id] });
     }
-
-    runPipeline();
-    return () => { cancelled = true; };
-  }, [step, txId, queryClient, user?.id]);
+  };
 
   const reset = () => {
     setIsOpen(false);
     setTimeout(() => {
       setStep("amount");
       setAmount("");
-      setCurrentStage(0);
       setTxId(null);
       setPixKey("");
       setFeeInfo(null);
+      setPipelineStarted(false);
     }, 500);
   };
 
   const displayNetUsd = feeInfo?.netUsd || netUsd.toFixed(2);
   const displayFeeUsd = feeInfo?.feeUsd || feeUsd.toFixed(2);
+  const currentStage = txStatus?.stage || 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -190,19 +202,32 @@ export function DepositModal() {
               <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6 py-4">
                 <div className="relative space-y-8 pl-4 before:absolute before:inset-y-2 before:left-[11px] before:w-[2px] before:bg-white/10">
                   {PROCESS_STAGES.map((stage, index) => {
-                    const isActive = index === currentStage;
-                    const isCompleted = index < currentStage;
+                    const isActive = index === currentStage || (index + 1) === currentStage;
+                    const isCompleted = (index + 1) < currentStage || (index + 1 === currentStage && currentStage === 4);
                     const Icon = stage.icon;
+
+                    const txHashForStage =
+                      index === 0 ? txStatus?.mintTxHash :
+                      index === 1 ? txStatus?.bridgeTxHash :
+                      index === 2 || index === 3 ? txStatus?.stakeTxHash : null;
+
                     return (
-                      <div key={stage.id} className="relative flex items-center gap-4">
-                        <div className={cn("relative z-10 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500", isCompleted ? "bg-primary border-primary text-black" : isActive ? "bg-card border-primary text-primary shadow-[0_0_10px_rgba(16,185,129,0.4)]" : "bg-card border-white/10 text-muted-foreground")}>
+                      <div key={stage.id} className="relative flex items-start gap-4">
+                        <div className={cn("relative z-10 w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-500 mt-0.5", isCompleted ? "bg-primary border-primary text-black" : isActive ? "bg-card border-primary text-primary shadow-[0_0_10px_rgba(16,185,129,0.4)]" : "bg-card border-white/10 text-muted-foreground")}>
                           {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isActive ? <Loader2 className="w-4 h-4 animate-spin" /> : <div className="w-2 h-2 rounded-full bg-muted-foreground" />}
                         </div>
-                        <div className={cn("flex items-center gap-3 transition-all duration-500", isActive ? "opacity-100 scale-100" : "opacity-50")}>
-                          <div className={cn("p-2 rounded-lg bg-white/5", isActive && "bg-primary/10 text-primary")}>
-                            <Icon className="w-4 h-4" />
+                        <div className={cn("flex-1 transition-all duration-500", isActive || isCompleted ? "opacity-100" : "opacity-50")}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-lg bg-white/5", isActive && "bg-primary/10 text-primary")}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className={cn("text-sm font-medium", isActive && "text-primary")}>{stage.label}</span>
                           </div>
-                          <span className={cn("text-sm font-medium", isActive && "text-primary")}>{stage.label}</span>
+                          {txHashForStage && isCompleted && (
+                            <div className="mt-2 ml-11">
+                              <TxHashLink txHash={txHashForStage} explorerBaseUrl={txStatus?.explorerBaseUrl} compact />
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -234,6 +259,31 @@ export function DepositModal() {
                     <span className="text-accent font-medium">Aave V3 (Optimism)</span>
                   </div>
                 </div>
+
+                {(txStatus?.mintTxHash || txStatus?.bridgeTxHash || txStatus?.stakeTxHash) && (
+                  <div className="w-full bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      {t("blockchain.onChainProof")}
+                    </div>
+                    <div className="space-y-2">
+                      {txStatus.mintTxHash && (
+                        <TxHashLink txHash={txStatus.mintTxHash} explorerBaseUrl={txStatus.explorerBaseUrl} label={t("blockchain.mintProof")} />
+                      )}
+                      {txStatus.bridgeTxHash && (
+                        <TxHashLink txHash={txStatus.bridgeTxHash} explorerBaseUrl={txStatus.explorerBaseUrl} label={t("blockchain.bridgeProof")} />
+                      )}
+                      {txStatus.stakeTxHash && (
+                        <TxHashLink txHash={txStatus.stakeTxHash} explorerBaseUrl={txStatus.explorerBaseUrl} label={t("blockchain.stakeProof")} />
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3" />
+                      {t("blockchain.verifyYourself")} Etherscan
+                    </p>
+                  </div>
+                )}
+
                 <Button onClick={reset} className="w-full h-12 font-bold bg-white/10 hover:bg-white/20 cursor-pointer" data-testid="button-return-dashboard">
                   {t("deposit.returnDashboard")}
                 </Button>

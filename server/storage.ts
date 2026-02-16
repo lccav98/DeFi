@@ -11,17 +11,21 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserWallet(userId: string, walletAddress: string): Promise<User | undefined>;
 
   getTransactionsByUser(userId: string): Promise<Transaction[]>;
   getTransaction(id: string): Promise<Transaction | undefined>;
   createTransaction(tx: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, stage?: number): Promise<Transaction | undefined>;
+  updateTransactionStage(id: string, stage: number, status: string, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
+  updateTransactionTxHashes(id: string, hashes: { mintTxHash?: string; bridgeTxHash?: string; stakeTxHash?: string; unstakeTxHash?: string }): Promise<Transaction | undefined>;
 
   getInvestmentsByUser(userId: string): Promise<Investment[]>;
   getInvestment(id: string): Promise<Investment | undefined>;
   createInvestment(inv: InsertInvestment): Promise<Investment>;
   updateInvestmentValue(id: string, currentValue: string): Promise<Investment | undefined>;
   deactivateInvestment(id: string): Promise<Investment | undefined>;
+  updateInvestmentUnstake(id: string, unstakeTxHash: string): Promise<Investment | undefined>;
   withdrawInvestment(investmentId: string, txData: InsertTransaction): Promise<{ investment: Investment; transaction: Transaction }>;
 
   updateUserStripeInfo(userId: string, stripeCustomerId: string): Promise<User | undefined>;
@@ -50,6 +54,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserWallet(userId: string, walletAddress: string): Promise<User | undefined> {
+    const [updated] = await db.update(users).set({ walletAddress }).where(eq(users.id, userId)).returning();
+    return updated;
+  }
+
   async getTransactionsByUser(userId: string): Promise<Transaction[]> {
     return await db.select().from(transactions)
       .where(eq(transactions.userId, userId))
@@ -70,6 +79,20 @@ export class DatabaseStorage implements IStorage {
     const updates: any = { status };
     if (stage !== undefined) updates.stage = stage;
     const [updated] = await db.update(transactions).set(updates).where(eq(transactions.id, id)).returning();
+    return updated;
+  }
+
+  async updateTransactionStage(id: string, stage: number, status: string, data: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const [updated] = await db.update(transactions).set({
+      stage,
+      status,
+      ...data,
+    }).where(eq(transactions.id, id)).returning();
+    return updated;
+  }
+
+  async updateTransactionTxHashes(id: string, hashes: { mintTxHash?: string; bridgeTxHash?: string; stakeTxHash?: string; unstakeTxHash?: string }): Promise<Transaction | undefined> {
+    const [updated] = await db.update(transactions).set(hashes).where(eq(transactions.id, id)).returning();
     return updated;
   }
 
@@ -96,6 +119,11 @@ export class DatabaseStorage implements IStorage {
 
   async deactivateInvestment(id: string): Promise<Investment | undefined> {
     const [updated] = await db.update(investments).set({ active: false }).where(eq(investments.id, id)).returning();
+    return updated;
+  }
+
+  async updateInvestmentUnstake(id: string, unstakeTxHash: string): Promise<Investment | undefined> {
+    const [updated] = await db.update(investments).set({ unstakeTxHash, active: false }).where(eq(investments.id, id)).returning();
     return updated;
   }
 
