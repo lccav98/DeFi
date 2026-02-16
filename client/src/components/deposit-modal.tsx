@@ -60,9 +60,9 @@ export function DepositModal() {
         setCurrentStage(3);
         setTimeout(() => {
           setStep("success");
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/investments"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard", user?.id] });
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions", user?.id] });
+          queryClient.invalidateQueries({ queryKey: ["/api/investments", user?.id] });
         }, 1000);
       }
     } catch {}

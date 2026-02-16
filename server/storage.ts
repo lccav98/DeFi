@@ -21,6 +21,8 @@ export interface IStorage {
   getInvestment(id: string): Promise<Investment | undefined>;
   createInvestment(inv: InsertInvestment): Promise<Investment>;
   updateInvestmentValue(id: string, currentValue: string): Promise<Investment | undefined>;
+  deactivateInvestment(id: string): Promise<Investment | undefined>;
+  withdrawInvestment(investmentId: string, txData: InsertTransaction): Promise<{ investment: Investment; transaction: Transaction }>;
 
   getDashboardStats(userId: string): Promise<{
     totalPortfolioValue: number;
@@ -88,6 +90,23 @@ export class DatabaseStorage implements IStorage {
   async updateInvestmentValue(id: string, currentValue: string): Promise<Investment | undefined> {
     const [updated] = await db.update(investments).set({ currentValue }).where(eq(investments.id, id)).returning();
     return updated;
+  }
+
+  async deactivateInvestment(id: string): Promise<Investment | undefined> {
+    const [updated] = await db.update(investments).set({ active: false }).where(eq(investments.id, id)).returning();
+    return updated;
+  }
+
+  async withdrawInvestment(investmentId: string, txData: InsertTransaction): Promise<{ investment: Investment; transaction: Transaction }> {
+    return await db.transaction(async (tx) => {
+      const [updatedInv] = await tx.update(investments).set({ active: false }).where(eq(investments.id, investmentId)).returning();
+      if (!updatedInv) throw new Error("Failed to deactivate investment");
+
+      const [createdTx] = await tx.insert(transactions).values(txData).returning();
+      if (!createdTx) throw new Error("Failed to create withdrawal transaction");
+
+      return { investment: updatedInv, transaction: createdTx };
+    });
   }
 
   async getDashboardStats(userId: string): Promise<{

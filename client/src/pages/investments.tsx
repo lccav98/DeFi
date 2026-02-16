@@ -1,12 +1,14 @@
+import { useState } from "react";
 import Layout from "@/components/layout";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Check, Shield, ArrowUpRight, Loader2 } from "lucide-react";
+import { Check, Shield, ArrowUpRight, Loader2, ArrowDownLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Investment } from "@shared/schema";
+import { WithdrawModal } from "@/components/withdraw-modal";
 
 const PLANS = [
   { id: "plan-3", duration: "3 Months", apy: "8.5%", risk: "Low", min: 50 },
@@ -16,11 +18,15 @@ const PLANS = [
 
 export default function InvestmentsPage() {
   const { user } = useAuth();
+  const [withdrawInvestment, setWithdrawInvestment] = useState<Investment | null>(null);
 
   const { data: investments = [], isLoading } = useQuery<Investment[]>({
     queryKey: ["/api/investments", user?.id],
     enabled: !!user,
   });
+
+  const activeInvestments = investments.filter(i => i.active);
+  const inactiveInvestments = investments.filter(i => !i.active);
 
   return (
     <Layout>
@@ -62,25 +68,26 @@ export default function InvestmentsPage() {
         <section className="mt-12">
           <h2 className="text-2xl font-display font-bold mb-6">Your Active Positions</h2>
           <Card className="glass-panel border-white/5 overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 border-b border-white/5 bg-white/5 font-medium text-sm text-muted-foreground">
+            <div className="hidden md:grid grid-cols-5 gap-4 p-6 border-b border-white/5 bg-white/5 font-medium text-sm text-muted-foreground">
               <div>Asset / Protocol</div>
               <div>Amount Staked</div>
               <div>Current Value</div>
               <div>APY / Yield</div>
+              <div>Actions</div>
             </div>
             {isLoading ? (
               <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-            ) : investments.length === 0 ? (
+            ) : activeInvestments.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <p className="text-lg">No active investments</p>
                 <p className="text-sm">Deposit via PIX to start earning yield.</p>
               </div>
             ) : (
               <div className="divide-y divide-white/5">
-                {investments.filter(i => i.active).map((inv) => {
+                {activeInvestments.map((inv) => {
                   const gain = parseFloat(inv.currentValue) - parseFloat(inv.amountUsd);
                   return (
-                    <div key={inv.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 hover:bg-white/5 transition-colors items-center" data-testid={`row-investment-${inv.id}`}>
+                    <div key={inv.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-6 hover:bg-white/5 transition-colors items-center" data-testid={`row-investment-${inv.id}`}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">A</div>
                         <div>
@@ -101,6 +108,18 @@ export default function InvestmentsPage() {
                           {inv.apy}% APY
                         </div>
                       </div>
+                      <div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-400 cursor-pointer"
+                          onClick={() => setWithdrawInvestment(inv)}
+                          data-testid={`button-withdraw-${inv.id}`}
+                        >
+                          <ArrowDownLeft className="w-4 h-4 mr-1" />
+                          Withdraw
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}
@@ -108,7 +127,45 @@ export default function InvestmentsPage() {
             )}
           </Card>
         </section>
+
+        {inactiveInvestments.length > 0 && (
+          <section>
+            <h2 className="text-xl font-display font-bold mb-4 text-muted-foreground">Closed Positions</h2>
+            <Card className="glass-panel border-white/5 overflow-hidden opacity-60">
+              <div className="divide-y divide-white/5">
+                {inactiveInvestments.map((inv) => (
+                  <div key={inv.id} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-muted-foreground font-bold">A</div>
+                      <div>
+                        <p className="font-medium text-muted-foreground">{inv.protocol}</p>
+                        <p className="text-xs text-muted-foreground">{inv.network} Network</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-mono text-muted-foreground">${parseFloat(inv.amountUsd).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="font-mono text-muted-foreground">${parseFloat(inv.currentValue).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground border border-white/5">Withdrawn</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+        )}
       </div>
+
+      {withdrawInvestment && (
+        <WithdrawModal
+          investment={withdrawInvestment}
+          isOpen={!!withdrawInvestment}
+          onClose={() => setWithdrawInvestment(null)}
+        />
+      )}
     </Layout>
   );
 }

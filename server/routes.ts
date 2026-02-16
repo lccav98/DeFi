@@ -151,6 +151,60 @@ export async function registerRoutes(
     }
   });
 
+  // ============ WITHDRAW FLOW ============
+  const withdrawSchema = z.object({
+    userId: z.string().min(1),
+    investmentId: z.string().min(1),
+    pixKey: z.string().optional(),
+  });
+
+  app.post("/api/withdraw", async (req, res) => {
+    try {
+      const { userId, investmentId, pixKey: userPixKey } = withdrawSchema.parse(req.body);
+
+      const investment = await storage.getInvestment(investmentId);
+      if (!investment || investment.userId !== userId) {
+        return res.status(404).json({ message: "Investment not found" });
+      }
+      if (!investment.active) {
+        return res.status(400).json({ message: "Investment is already withdrawn" });
+      }
+
+      const withdrawalFee = 0.02;
+      const currentValueUsd = parseFloat(investment.currentValue);
+      const feeUsd = currentValueUsd * withdrawalFee;
+      const netUsd = currentValueUsd - feeUsd;
+      const netBrl = (netUsd * EXCHANGE_RATE).toFixed(2);
+
+      const result = await storage.withdrawInvestment(investmentId, {
+        userId,
+        type: "withdrawal",
+        amountBrl: netBrl,
+        amountUsd: netUsd.toFixed(2),
+        status: "completed",
+        protocol: investment.protocol,
+        details: `Unstake → Bridge → DPIX → PIX (fee: $${feeUsd.toFixed(2)})${userPixKey ? ` → ${userPixKey}` : ""}`,
+        stage: 4,
+      });
+
+      return res.json({
+        transaction: result.transaction,
+        summary: {
+          grossUsd: currentValueUsd.toFixed(2),
+          feeUsd: feeUsd.toFixed(2),
+          feePercent: (withdrawalFee * 100).toFixed(0),
+          netUsd: netUsd.toFixed(2),
+          netBrl,
+        },
+      });
+    } catch (e: any) {
+      if (e instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: e.errors });
+      }
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
   // ============ DEPOSIT FLOW (PIX) ============
   app.post("/api/deposit", async (req, res) => {
     try {
