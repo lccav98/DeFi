@@ -128,7 +128,10 @@ export function DepositModal() {
 
       const stripe = await getStripe();
       if (stripe && data.clientSecret) {
-        const { error } = await stripe.confirmPixPayment(data.clientSecret, {
+        const { error } = await (stripe as any).confirmPixPayment(data.clientSecret, {
+          payment_method: {
+            pix: {},
+          },
           return_url: window.location.href,
         });
 
