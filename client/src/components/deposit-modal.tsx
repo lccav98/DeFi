@@ -230,7 +230,7 @@ export function DepositModal() {
                     <span className="text-primary font-bold">12.5%</span>
                   </div>
                 </div>
-                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50 || cpf.replace(/\D/g, "").length !== 11} onClick={handleCreatePixPayment} data-testid="button-generate-pix">
+                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) <= 0 || cpf.replace(/\D/g, "").length !== 11} onClick={handleCreatePixPayment} data-testid="button-generate-pix">
                   {t("deposit.payWithPix")}
                 </Button>
               </motion.div>

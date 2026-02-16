@@ -286,8 +286,8 @@ export async function registerRoutes(
   app.post("/api/deposit/pix", async (req, res) => {
     try {
       const { userId, amountBrl } = req.body;
-      if (!userId || !amountBrl || parseFloat(amountBrl) < 50) {
-        return res.status(400).json({ message: "Invalid deposit. Minimum R$ 50.00" });
+      if (!userId || !amountBrl || parseFloat(amountBrl) <= 0) {
+        return res.status(400).json({ message: "Invalid deposit amount" });
       }
 
       const stripe = await getUncachableStripeClient();
