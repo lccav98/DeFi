@@ -15,6 +15,7 @@ export interface IStorage {
 
   getTransactionsByUser(userId: string): Promise<Transaction[]>;
   getTransaction(id: string): Promise<Transaction | undefined>;
+  getTransactionByStripePaymentIntentId(paymentIntentId: string): Promise<Transaction | undefined>;
   createTransaction(tx: InsertTransaction): Promise<Transaction>;
   updateTransactionStatus(id: string, status: string, stage?: number): Promise<Transaction | undefined>;
   updateTransactionStage(id: string, stage: number, status: string, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
@@ -67,6 +68,11 @@ export class DatabaseStorage implements IStorage {
 
   async getTransaction(id: string): Promise<Transaction | undefined> {
     const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+    return tx;
+  }
+
+  async getTransactionByStripePaymentIntentId(paymentIntentId: string): Promise<Transaction | undefined> {
+    const [tx] = await db.select().from(transactions).where(eq(transactions.stripePaymentIntentId, paymentIntentId));
     return tx;
   }
 

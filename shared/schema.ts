@@ -29,6 +29,7 @@ export const transactions = pgTable("transactions", {
   unstakeTxHash: text("unstake_tx_hash"),
   chainId: integer("chain_id"),
   explorerBaseUrl: text("explorer_base_url"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

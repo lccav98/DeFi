@@ -1,4 +1,6 @@
 import { getStripeSync } from './stripeClient';
+import { storage } from './storage';
+import { executeDepositPipeline } from './blockchain/pipeline';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -13,5 +15,24 @@ export class WebhookHandlers {
 
     const sync = await getStripeSync();
     await sync.processWebhook(payload, signature);
+
+    try {
+      const event = JSON.parse(payload.toString());
+      if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object;
+        if (paymentIntent.metadata?.type === 'pix_deposit') {
+          console.log(`[webhook] PIX payment succeeded: ${paymentIntent.id}`);
+          const tx = await storage.getTransactionByStripePaymentIntentId(paymentIntent.id);
+          if (tx && tx.status === 'awaiting_payment') {
+            await storage.updateTransactionStatus(tx.id, 'processing', 0);
+            executeDepositPipeline(tx.id, tx.amountUsd!, tx.userId).catch((err) => {
+              console.error(`[webhook] Pipeline failed for tx ${tx.id}:`, err);
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[webhook] Error processing PIX event:', err);
+    }
   }
 }

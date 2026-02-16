@@ -283,6 +283,100 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/deposit/pix", async (req, res) => {
+    try {
+      const { userId, amountBrl } = req.body;
+      if (!userId || !amountBrl || parseFloat(amountBrl) < 50) {
+        return res.status(400).json({ message: "Invalid deposit. Minimum R$ 50.00" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          metadata: { userId, username: user.username },
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId);
+      }
+
+      const amountCentavos = Math.round(parseFloat(amountBrl) * 100);
+      const config = getNetworkConfig();
+      const grossUsd = parseFloat(amountBrl) / EXCHANGE_RATE;
+      const feeUsd = grossUsd * (PLATFORM_FEE_PERCENT / 100);
+      const netUsd = (grossUsd - feeUsd).toFixed(2);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountCentavos,
+        currency: "brl",
+        payment_method_types: ["pix"],
+        customer: customerId,
+        metadata: {
+          userId,
+          amountBrl: amountBrl.toString(),
+          netUsd,
+          feeUsd: feeUsd.toFixed(2),
+          type: "pix_deposit",
+        },
+      });
+
+      const tx = await storage.createTransaction({
+        userId,
+        type: "deposit",
+        amountBrl: amountBrl.toString(),
+        amountUsd: netUsd,
+        status: "awaiting_payment",
+        protocol: "Aave V3",
+        details: `PIX → DPIX → USDT → Stake (fee: ${PLATFORM_FEE_PERCENT}% = $${feeUsd.toFixed(2)})`,
+        stage: 0,
+        chainId: config.chainId,
+        explorerBaseUrl: config.explorerBaseUrl,
+        stripePaymentIntentId: paymentIntent.id,
+      });
+
+      return res.status(201).json({
+        transaction: tx,
+        clientSecret: paymentIntent.client_secret,
+        fee: {
+          percent: PLATFORM_FEE_PERCENT,
+          amountUsd: feeUsd.toFixed(2),
+          netUsd,
+        },
+      });
+    } catch (e: any) {
+      console.error("[pix] Error creating PIX payment:", e);
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/deposit/pix/:id/confirm", async (req, res) => {
+    try {
+      const tx = await storage.getTransaction(req.params.id);
+      if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+      if (tx.status === "completed" || tx.status === "processing") {
+        return res.json({ status: tx.status, transactionId: tx.id });
+      }
+
+      await storage.updateTransactionStatus(tx.id, "processing", 0);
+
+      executeDepositPipeline(tx.id, tx.amountUsd!, tx.userId).catch((err) => {
+        console.error(`[pipeline] PIX pipeline failed for tx ${tx.id}:`, err);
+      });
+
+      return res.json({
+        message: "Payment confirmed, pipeline started",
+        transactionId: tx.id,
+        blockchain: isBlockchainConfigured() ? "real" : "simulated",
+      });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post("/api/deposit", async (req, res) => {
     try {
       const { userId, amountBrl } = req.body;

@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, QrCode, CheckCircle2, Loader2, Wallet, ShieldCheck, Banknote, ExternalLink } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, Wallet, ShieldCheck, Banknote, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -12,17 +12,31 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n";
 import { TxHashLink } from "@/components/tx-hash-link";
+import { loadStripe, type Stripe as StripeType } from "@stripe/stripe-js";
 
 const PLATFORM_FEE = 1.5;
 const EXCHANGE_RATE = 5.0;
 
+let stripePromise: Promise<StripeType | null> | null = null;
+
+function getStripe() {
+  if (!stripePromise) {
+    stripePromise = fetch("/api/stripe/config")
+      .then((r) => r.json())
+      .then((data) => loadStripe(data.publishableKey))
+      .catch(() => null);
+  }
+  return stripePromise;
+}
+
 export function DepositModal() {
   const [isOpen, setIsOpen] = useState(false);
-  const [step, setStep] = useState<"amount" | "qrcode" | "processing" | "success">("amount");
+  const [step, setStep] = useState<"amount" | "pix_payment" | "processing" | "success">("amount");
   const [amount, setAmount] = useState("");
-  const [pixKey, setPixKey] = useState("");
   const [txId, setTxId] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [feeInfo, setFeeInfo] = useState<{ feeUsd: string; netUsd: string } | null>(null);
+  const [pixPaymentStatus, setPixPaymentStatus] = useState<"waiting" | "confirming" | "confirmed" | "error">("waiting");
   const [pipelineStarted, setPipelineStarted] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -67,43 +81,72 @@ export function DepositModal() {
     }
   }, [txStatus, step, queryClient, user?.id]);
 
-  const handleGeneratePix = async () => {
+  const pollPaymentStatus = useCallback(async (secret: string, transactionId: string) => {
+    const stripe = await getStripe();
+    if (!stripe) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const { paymentIntent } = await stripe.retrievePaymentIntent(secret);
+        if (paymentIntent?.status === "succeeded") {
+          clearInterval(pollInterval);
+          setPixPaymentStatus("confirmed");
+
+          setStep("processing");
+          if (!pipelineStarted) {
+            setPipelineStarted(true);
+            try {
+              await apiRequest("POST", `/api/deposit/pix/${transactionId}/confirm`, {});
+            } catch {
+              for (let stage = 0; stage < 4; stage++) {
+                try {
+                  await apiRequest("POST", `/api/transactions/${transactionId}/process`, {});
+                } catch {}
+                if (stage < 3) await new Promise((r) => setTimeout(r, 2500));
+              }
+            }
+          }
+        } else if (paymentIntent?.status === "canceled" || paymentIntent?.status === "requires_payment_method") {
+          clearInterval(pollInterval);
+          setPixPaymentStatus("error");
+        }
+      } catch {}
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [pipelineStarted]);
+
+  const handleCreatePixPayment = async () => {
     if (!user) return;
     try {
-      const res = await apiRequest("POST", "/api/deposit", {
+      const res = await apiRequest("POST", "/api/deposit/pix", {
         userId: user.id,
         amountBrl: amount,
       });
       const data = await res.json();
-      setPixKey(data.pixKey);
+      setClientSecret(data.clientSecret);
       setTxId(data.transaction.id);
       if (data.fee) {
         setFeeInfo({ feeUsd: data.fee.amountUsd, netUsd: data.fee.netUsd });
       }
-      setStep("qrcode");
+      setStep("pix_payment");
+
+      const stripe = await getStripe();
+      if (stripe && data.clientSecret) {
+        const { error } = await stripe.confirmPixPayment(data.clientSecret, {
+          return_url: window.location.href,
+        });
+
+        if (error) {
+          if (error.type !== "validation_error") {
+            toast({ title: t("auth.error"), description: error.message || t("deposit.errorGenerating"), variant: "destructive" });
+          }
+        }
+
+        pollPaymentStatus(data.clientSecret, data.transaction.id);
+      }
     } catch (err: any) {
       toast({ title: t("auth.error"), description: t("deposit.errorGenerating"), variant: "destructive" });
-    }
-  };
-
-  const handleCopyPix = async () => {
-    navigator.clipboard.writeText(pixKey);
-    toast({ title: t("deposit.pixKeyCopied"), description: t("deposit.pixKeyCopiedDesc") });
-
-    setStep("processing");
-
-    if (txId && !pipelineStarted) {
-      setPipelineStarted(true);
-      try {
-        await apiRequest("POST", `/api/deposit/${txId}/execute-pipeline`, {});
-      } catch {
-        for (let stage = 0; stage < 4; stage++) {
-          try {
-            await apiRequest("POST", `/api/transactions/${txId}/process`, {});
-          } catch {}
-          if (stage < 3) await new Promise((r) => setTimeout(r, 2500));
-        }
-      }
     }
   };
 
@@ -113,9 +156,10 @@ export function DepositModal() {
       setStep("amount");
       setAmount("");
       setTxId(null);
-      setPixKey("");
+      setClientSecret(null);
       setFeeInfo(null);
       setPipelineStarted(false);
+      setPixPaymentStatus("waiting");
     }, 500);
   };
 
@@ -136,7 +180,7 @@ export function DepositModal() {
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="text-2xl font-display font-bold text-center">
             {step === "amount" && t("deposit.investViaPix")}
-            {step === "qrcode" && t("deposit.scanPay")}
+            {step === "pix_payment" && t("deposit.scanPay")}
             {step === "processing" && t("deposit.automatingDefi")}
             {step === "success" && t("deposit.investmentActive")}
           </DialogTitle>
@@ -172,29 +216,53 @@ export function DepositModal() {
                     <span className="text-primary font-bold">12.5%</span>
                   </div>
                 </div>
-                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50} onClick={handleGeneratePix} data-testid="button-generate-pix">
-                  {t("deposit.generatePix")}
+                <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50} onClick={handleCreatePixPayment} data-testid="button-generate-pix">
+                  {t("deposit.payWithPix")}
                 </Button>
               </motion.div>
             )}
 
-            {step === "qrcode" && (
-              <motion.div key="qrcode" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col items-center space-y-6">
-                <div className="relative group">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-primary to-accent rounded-xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
-                  <div className="relative bg-white p-4 rounded-xl">
-                    <QrCode className="w-48 h-48 text-black" />
-                  </div>
-                </div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">{t("deposit.payWithApp")}</p>
+            {step === "pix_payment" && (
+              <motion.div key="pix_payment" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col items-center space-y-6">
+                <div className="text-center space-y-2">
                   <p className="text-2xl font-display font-bold" data-testid="text-pix-amount">R$ {parseFloat(amount).toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">{t("deposit.fee")}: ${displayFeeUsd} | {t("deposit.staked")}: ${displayNetUsd}</p>
                 </div>
-                <Button variant="outline" className="w-full h-12 border-primary/20 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer" onClick={handleCopyPix} data-testid="button-copy-pix">
-                  {t("deposit.copyPix")}
-                </Button>
-                <p className="text-xs text-center text-muted-foreground animate-pulse">{t("deposit.waitingPayment")}</p>
+
+                <div className="w-full bg-white/5 rounded-xl p-6 text-center space-y-4">
+                  {pixPaymentStatus === "waiting" && (
+                    <>
+                      <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+                      <p className="text-sm text-muted-foreground">{t("deposit.pixRedirect")}</p>
+                      <p className="text-xs text-muted-foreground animate-pulse">{t("deposit.waitingPayment")}</p>
+                    </>
+                  )}
+                  {pixPaymentStatus === "confirming" && (
+                    <>
+                      <Loader2 className="w-8 h-8 animate-spin text-yellow-500 mx-auto" />
+                      <p className="text-sm text-yellow-500 font-medium">{t("deposit.confirmingPayment")}</p>
+                    </>
+                  )}
+                  {pixPaymentStatus === "confirmed" && (
+                    <>
+                      <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto" />
+                      <p className="text-sm text-green-500 font-medium">{t("deposit.paymentConfirmed")}</p>
+                    </>
+                  )}
+                  {pixPaymentStatus === "error" && (
+                    <>
+                      <p className="text-sm text-red-500 font-medium">{t("deposit.paymentFailed")}</p>
+                      <Button variant="outline" className="cursor-pointer" onClick={() => { setStep("amount"); setPixPaymentStatus("waiting"); }}>
+                        {t("deposit.tryAgain")}
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span>{t("deposit.stripeSecure")}</span>
+                </div>
               </motion.div>
             )}
 
