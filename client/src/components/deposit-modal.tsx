@@ -10,16 +10,10 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "@/lib/i18n";
 
 const PLATFORM_FEE = 1.5;
 const EXCHANGE_RATE = 5.0;
-
-const PROCESS_STAGES = [
-  { id: 1, label: "Detecting PIX Deposit", icon: Banknote },
-  { id: 2, label: "Minting Digital Real (DPIX)", icon: Wallet },
-  { id: 3, label: "Bridging to DeFi Network", icon: ArrowRight },
-  { id: 4, label: "Staking in Yield Protocol", icon: ShieldCheck },
-];
 
 export function DepositModal() {
   const [isOpen, setIsOpen] = useState(false);
@@ -32,6 +26,14 @@ export function DepositModal() {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  const PROCESS_STAGES = [
+    { id: 1, label: t("deposit.stage1"), icon: Banknote },
+    { id: 2, label: t("deposit.stage2"), icon: Wallet },
+    { id: 3, label: t("deposit.stage3"), icon: ArrowRight },
+    { id: 4, label: t("deposit.stage4"), icon: ShieldCheck },
+  ];
 
   const grossUsd = amount ? parseFloat(amount) / EXCHANGE_RATE : 0;
   const feeUsd = grossUsd * (PLATFORM_FEE / 100);
@@ -52,13 +54,13 @@ export function DepositModal() {
       }
       setStep("qrcode");
     } catch (err: any) {
-      toast({ title: "Error", description: "Failed to generate PIX code", variant: "destructive" });
+      toast({ title: t("auth.error"), description: t("deposit.errorGenerating"), variant: "destructive" });
     }
   };
 
   const handleCopyPix = () => {
     navigator.clipboard.writeText(pixKey);
-    toast({ title: "PIX Key Copied", description: "Paste this code in your banking app to pay." });
+    toast({ title: t("deposit.pixKeyCopied"), description: t("deposit.pixKeyCopiedDesc") });
     setTimeout(() => setStep("processing"), 2000);
   };
 
@@ -68,7 +70,7 @@ export function DepositModal() {
     let cancelled = false;
 
     async function runPipeline() {
-      for (let stage = 0; stage < PROCESS_STAGES.length; stage++) {
+      for (let stage = 0; stage < 4; stage++) {
         if (cancelled) return;
         setCurrentStage(stage);
 
@@ -76,7 +78,7 @@ export function DepositModal() {
           await apiRequest("POST", `/api/transactions/${txId}/process`, {});
         } catch {}
 
-        if (stage < PROCESS_STAGES.length - 1) {
+        if (stage < 3) {
           await new Promise((r) => setTimeout(r, 2500));
         }
       }
@@ -113,7 +115,7 @@ export function DepositModal() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all text-lg py-6 rounded-xl font-bold cursor-pointer" data-testid="button-deposit">
-          Deposit PIX & Start Earning
+          {t("deposit.depositBtn")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-xl border-white/10 text-foreground p-0 gap-0 overflow-hidden">
@@ -121,10 +123,10 @@ export function DepositModal() {
         
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="text-2xl font-display font-bold text-center">
-            {step === "amount" && "Invest via PIX"}
-            {step === "qrcode" && "Scan & Pay"}
-            {step === "processing" && "Automating DeFi..."}
-            {step === "success" && "Investment Active!"}
+            {step === "amount" && t("deposit.investViaPix")}
+            {step === "qrcode" && t("deposit.scanPay")}
+            {step === "processing" && t("deposit.automatingDefi")}
+            {step === "success" && t("deposit.investmentActive")}
           </DialogTitle>
         </DialogHeader>
 
@@ -133,33 +135,33 @@ export function DepositModal() {
             {step === "amount" && (
               <motion.div key="amount" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="deposit-amount" className="text-muted-foreground">Amount (BRL)</Label>
+                  <Label htmlFor="deposit-amount" className="text-muted-foreground">{t("deposit.amountBrl")}</Label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">R$</span>
                     <Input id="deposit-amount" type="number" placeholder="0.00" className="pl-12 text-2xl font-display bg-white/5 border-white/10 focus:border-primary/50 h-14" value={amount} onChange={(e) => setAmount(e.target.value)} data-testid="input-deposit-amount" />
                   </div>
-                  <p className="text-xs text-muted-foreground text-right">Min: R$ 50.00</p>
+                  <p className="text-xs text-muted-foreground text-right">{t("deposit.minAmount")}</p>
                 </div>
                 <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Gross USD Value</span>
+                    <span className="text-muted-foreground">{t("deposit.grossUsd")}</span>
                     <span className="font-mono font-medium">${grossUsd.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Platform Fee ({PLATFORM_FEE}%)</span>
+                    <span className="text-muted-foreground">{t("deposit.platformFee")} ({PLATFORM_FEE}%)</span>
                     <span className="font-mono text-yellow-500">-${feeUsd.toFixed(2)}</span>
                   </div>
                   <div className="border-t border-white/5 pt-2 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Net Staked Amount</span>
+                    <span className="text-muted-foreground">{t("deposit.netStaked")}</span>
                     <span className="font-mono font-bold text-primary" data-testid="text-usd-value">${netUsd.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Est. APY</span>
+                    <span className="text-muted-foreground">{t("deposit.estApy")}</span>
                     <span className="text-primary font-bold">12.5%</span>
                   </div>
                 </div>
                 <Button className="w-full h-12 text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer" disabled={!amount || parseFloat(amount) < 50} onClick={handleGeneratePix} data-testid="button-generate-pix">
-                  Generate PIX Code
+                  {t("deposit.generatePix")}
                 </Button>
               </motion.div>
             )}
@@ -173,14 +175,14 @@ export function DepositModal() {
                   </div>
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="text-sm text-muted-foreground">Pay with your banking app</p>
+                  <p className="text-sm text-muted-foreground">{t("deposit.payWithApp")}</p>
                   <p className="text-2xl font-display font-bold" data-testid="text-pix-amount">R$ {parseFloat(amount).toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">Fee: ${displayFeeUsd} | Staked: ${displayNetUsd}</p>
+                  <p className="text-xs text-muted-foreground">{t("deposit.fee")}: ${displayFeeUsd} | {t("deposit.staked")}: ${displayNetUsd}</p>
                 </div>
                 <Button variant="outline" className="w-full h-12 border-primary/20 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer" onClick={handleCopyPix} data-testid="button-copy-pix">
-                  Copy PIX Code
+                  {t("deposit.copyPix")}
                 </Button>
-                <p className="text-xs text-center text-muted-foreground animate-pulse">Waiting for payment...</p>
+                <p className="text-xs text-center text-muted-foreground animate-pulse">{t("deposit.waitingPayment")}</p>
               </motion.div>
             )}
 
@@ -215,25 +217,25 @@ export function DepositModal() {
                   <CheckCircle2 className="w-10 h-10 text-primary" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold font-display text-white">Investment Active!</h3>
-                  <p className="text-muted-foreground">Your funds have been successfully bridged and staked.</p>
+                  <h3 className="text-2xl font-bold font-display text-white">{t("deposit.successTitle")}</h3>
+                  <p className="text-muted-foreground">{t("deposit.successDesc")}</p>
                 </div>
                 <div className="w-full bg-white/5 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Staked Amount</span>
+                    <span className="text-muted-foreground">{t("deposit.stakedAmount")}</span>
                     <span className="font-mono text-white">${displayNetUsd} USDT</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Platform Fee</span>
+                    <span className="text-muted-foreground">{t("deposit.platformFee")}</span>
                     <span className="font-mono text-yellow-500">${displayFeeUsd}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Protocol</span>
+                    <span className="text-muted-foreground">{t("deposit.protocol")}</span>
                     <span className="text-accent font-medium">Aave V3 (Optimism)</span>
                   </div>
                 </div>
                 <Button onClick={reset} className="w-full h-12 font-bold bg-white/10 hover:bg-white/20 cursor-pointer" data-testid="button-return-dashboard">
-                  Return to Dashboard
+                  {t("deposit.returnDashboard")}
                 </Button>
               </motion.div>
             )}

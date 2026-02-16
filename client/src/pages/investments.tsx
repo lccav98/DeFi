@@ -9,16 +9,18 @@ import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Investment } from "@shared/schema";
 import { WithdrawModal } from "@/components/withdraw-modal";
-
-const PLANS = [
-  { id: "plan-3", duration: "3 Months", apy: "8.5%", risk: "Low", min: 50 },
-  { id: "plan-6", duration: "6 Months", apy: "12.5%", risk: "Medium", min: 100, recommended: true },
-  { id: "plan-12", duration: "12 Months", apy: "18.2%", risk: "Medium-High", min: 500 },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export default function InvestmentsPage() {
   const { user } = useAuth();
   const [withdrawInvestment, setWithdrawInvestment] = useState<Investment | null>(null);
+  const { t } = useTranslation();
+
+  const PLANS = [
+    { id: "plan-3", duration: t("plans.months3"), apy: "8.5%", risk: t("plans.low"), min: 50 },
+    { id: "plan-6", duration: t("plans.months6"), apy: "12.5%", risk: t("plans.medium"), min: 100, recommended: true },
+    { id: "plan-12", duration: t("plans.months12"), apy: "18.2%", risk: t("plans.mediumHigh"), min: 500 },
+  ];
 
   const { data: investments = [], isLoading } = useQuery<Investment[]>({
     queryKey: ["/api/investments", user?.id],
@@ -32,33 +34,33 @@ export default function InvestmentsPage() {
     <Layout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-display font-bold text-white">Investment Plans</h1>
-          <p className="text-muted-foreground">Choose the best yield strategy for your goals.</p>
+          <h1 className="text-3xl font-display font-bold text-white">{t("investments.title")}</h1>
+          <p className="text-muted-foreground">{t("investments.subtitle")}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {PLANS.map((plan, index) => (
             <motion.div key={plan.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}
               className={cn("relative flex flex-col rounded-2xl border transition-all duration-300 overflow-hidden group hover:shadow-2xl", plan.recommended ? "bg-gradient-to-br from-card to-primary/5 border-primary/50 shadow-[0_0_30px_rgba(16,185,129,0.1)] scale-105 z-10" : "bg-card/40 border-white/5 hover:border-white/10 hover:bg-card/60")}>
-              {plan.recommended && <div className="bg-primary py-2 text-center text-primary-foreground text-sm font-bold uppercase tracking-wider">Most Popular</div>}
+              {plan.recommended && <div className="bg-primary py-2 text-center text-primary-foreground text-sm font-bold uppercase tracking-wider">{t("investments.mostPopular")}</div>}
               <div className="p-8 flex-1 flex flex-col">
                 <div className="mb-6">
-                  <span className="text-muted-foreground text-sm uppercase tracking-wider font-medium">{plan.duration} Lock</span>
+                  <span className="text-muted-foreground text-sm uppercase tracking-wider font-medium">{plan.duration} {t("investments.lock")}</span>
                   <div className="flex items-baseline gap-1 mt-2">
                     <span className="text-5xl font-display font-bold text-white">{plan.apy}</span>
                     <span className="text-xl text-primary font-medium">APY</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                    <Shield className="w-4 h-4" /> Risk Level: <span className="text-white font-medium">{plan.risk}</span>
+                    <Shield className="w-4 h-4" /> {t("investments.riskLevel")} <span className="text-white font-medium">{plan.risk}</span>
                   </p>
                 </div>
                 <ul className="space-y-4 mb-8 flex-1">
-                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">Automated compounding daily</span></li>
-                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">No gas fees for deposits</span></li>
-                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">Instant withdrawal (with 2% fee)</span></li>
+                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.autoCompound")}</span></li>
+                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.noGasFees")}</span></li>
+                  <li className="flex items-start gap-3 text-sm"><div className="mt-0.5 p-1 rounded-full bg-primary/10 text-primary"><Check className="w-3 h-3" /></div><span className="text-muted-foreground">{t("investments.instantWithdraw")}</span></li>
                 </ul>
                 <Button className={cn("w-full h-14 text-lg font-bold rounded-xl transition-all cursor-pointer", plan.recommended ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(16,185,129,0.3)]" : "bg-white/5 hover:bg-white/10 text-white border border-white/10")}>
-                  Start Investing
+                  {t("investments.startInvesting")}
                 </Button>
               </div>
             </motion.div>
@@ -66,21 +68,21 @@ export default function InvestmentsPage() {
         </div>
 
         <section className="mt-12">
-          <h2 className="text-2xl font-display font-bold mb-6">Your Active Positions</h2>
+          <h2 className="text-2xl font-display font-bold mb-6">{t("investments.activePositions")}</h2>
           <Card className="glass-panel border-white/5 overflow-hidden">
             <div className="hidden md:grid grid-cols-5 gap-4 p-6 border-b border-white/5 bg-white/5 font-medium text-sm text-muted-foreground">
-              <div>Asset / Protocol</div>
-              <div>Amount Staked</div>
-              <div>Current Value</div>
-              <div>APY / Yield</div>
-              <div>Actions</div>
+              <div>{t("investments.assetProtocol")}</div>
+              <div>{t("investments.amountStaked")}</div>
+              <div>{t("investments.currentValue")}</div>
+              <div>{t("investments.apyYield")}</div>
+              <div>{t("investments.actions")}</div>
             </div>
             {isLoading ? (
               <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
             ) : activeInvestments.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
-                <p className="text-lg">No active investments</p>
-                <p className="text-sm">Deposit via PIX to start earning yield.</p>
+                <p className="text-lg">{t("investments.noActive")}</p>
+                <p className="text-sm">{t("investments.depositToEarn")}</p>
               </div>
             ) : (
               <div className="divide-y divide-white/5">
@@ -92,12 +94,12 @@ export default function InvestmentsPage() {
                         <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-500 font-bold">A</div>
                         <div>
                           <p className="font-bold text-white">{inv.protocol}</p>
-                          <p className="text-xs text-muted-foreground">{inv.network} Network</p>
+                          <p className="text-xs text-muted-foreground">{inv.network} {t("investments.network")}</p>
                         </div>
                       </div>
                       <div>
                         <p className="font-mono text-white">${parseFloat(inv.amountUsd).toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">Initial Deposit</p>
+                        <p className="text-xs text-muted-foreground">{t("investments.initialDeposit")}</p>
                       </div>
                       <div>
                         <p className="font-mono text-primary font-bold">${parseFloat(inv.currentValue).toFixed(2)}</p>
@@ -117,7 +119,7 @@ export default function InvestmentsPage() {
                           data-testid={`button-withdraw-${inv.id}`}
                         >
                           <ArrowDownLeft className="w-4 h-4 mr-1" />
-                          Withdraw
+                          {t("investments.withdraw")}
                         </Button>
                       </div>
                     </div>
@@ -130,7 +132,7 @@ export default function InvestmentsPage() {
 
         {inactiveInvestments.length > 0 && (
           <section>
-            <h2 className="text-xl font-display font-bold mb-4 text-muted-foreground">Closed Positions</h2>
+            <h2 className="text-xl font-display font-bold mb-4 text-muted-foreground">{t("investments.closedPositions")}</h2>
             <Card className="glass-panel border-white/5 overflow-hidden opacity-60">
               <div className="divide-y divide-white/5">
                 {inactiveInvestments.map((inv) => (
@@ -139,7 +141,7 @@ export default function InvestmentsPage() {
                       <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-muted-foreground font-bold">A</div>
                       <div>
                         <p className="font-medium text-muted-foreground">{inv.protocol}</p>
-                        <p className="text-xs text-muted-foreground">{inv.network} Network</p>
+                        <p className="text-xs text-muted-foreground">{inv.network} {t("investments.network")}</p>
                       </div>
                     </div>
                     <div>
@@ -149,7 +151,7 @@ export default function InvestmentsPage() {
                       <p className="font-mono text-muted-foreground">${parseFloat(inv.currentValue).toFixed(2)}</p>
                     </div>
                     <div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground border border-white/5">Withdrawn</span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-white/5 text-muted-foreground border border-white/5">{t("investments.withdrawn")}</span>
                     </div>
                   </div>
                 ))}

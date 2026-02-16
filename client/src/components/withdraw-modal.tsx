@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Investment } from "@shared/schema";
+import { useTranslation } from "@/lib/i18n";
 
 const WITHDRAWAL_FEE = 0.02;
 
@@ -27,6 +28,7 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const currentValue = parseFloat(investment.currentValue);
   const fee = currentValue * WITHDRAWAL_FEE;
@@ -56,7 +58,7 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", user.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/investments", user.id] });
     } catch (err: any) {
-      toast({ title: "Erro", description: "Falha ao processar saque. Tente novamente.", variant: "destructive" });
+      toast({ title: t("withdraw.errorTitle"), description: t("withdraw.errorDesc"), variant: "destructive" });
       setStep("confirm");
     } finally {
       setLoading(false);
@@ -80,9 +82,9 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
 
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="text-2xl font-display font-bold text-center">
-            {step === "confirm" && "Withdraw Funds"}
-            {step === "processing" && "Processing..."}
-            {step === "success" && "Withdrawal Complete!"}
+            {step === "confirm" && t("withdraw.title")}
+            {step === "processing" && t("withdraw.processing")}
+            {step === "success" && t("withdraw.complete")}
           </DialogTitle>
         </DialogHeader>
 
@@ -93,40 +95,40 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="text-yellow-500 font-medium">Early withdrawal</p>
-                    <p className="text-muted-foreground">A 2% fee applies to all withdrawals.</p>
+                    <p className="text-yellow-500 font-medium">{t("withdraw.earlyWarningTitle")}</p>
+                    <p className="text-muted-foreground">{t("withdraw.earlyWarningDesc")}</p>
                   </div>
                 </div>
 
                 <div className="bg-white/5 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Position Value</span>
+                    <span className="text-muted-foreground">{t("withdraw.positionValue")}</span>
                     <span className="font-mono font-bold text-white">${currentValue.toFixed(2)} USDT</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Protocol</span>
+                    <span className="text-muted-foreground">{t("withdraw.protocol")}</span>
                     <span className="text-accent font-medium">{investment.protocol} ({investment.network})</span>
                   </div>
                   <div className="border-t border-white/5 my-2" />
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Withdrawal Fee (2%)</span>
+                    <span className="text-muted-foreground">{t("withdraw.withdrawalFee")}</span>
                     <span className="font-mono text-red-400">-${fee.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Net Amount (USD)</span>
+                    <span className="text-muted-foreground">{t("withdraw.netAmountUsd")}</span>
                     <span className="font-mono font-bold text-white">${netUsd.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">You Receive (BRL)</span>
+                    <span className="text-muted-foreground">{t("withdraw.youReceive")}</span>
                     <span className="font-mono font-bold text-primary text-lg">R$ {netBrl.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pix-key" className="text-muted-foreground">Your PIX Key (optional)</Label>
+                  <Label htmlFor="pix-key" className="text-muted-foreground">{t("withdraw.pixKeyLabel")}</Label>
                   <Input
                     id="pix-key"
-                    placeholder="CPF, email, phone or random key"
+                    placeholder={t("withdraw.pixKeyPlaceholder")}
                     className="bg-white/5 border-white/10 h-12 focus:border-primary/50"
                     value={pixKey}
                     onChange={(e) => setPixKey(e.target.value)}
@@ -140,7 +142,7 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
                   disabled={loading}
                   data-testid="button-confirm-withdraw"
                 >
-                  Confirm Withdrawal
+                  {t("withdraw.confirmBtn")}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </motion.div>
@@ -152,8 +154,8 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
                   <div className="w-20 h-20 rounded-full border-4 border-white/10 border-t-primary animate-spin" />
                 </div>
                 <div className="space-y-2">
-                  <p className="text-lg font-medium text-white">Processing withdrawal</p>
-                  <p className="text-sm text-muted-foreground">Unstaking → Bridging → Converting to PIX...</p>
+                  <p className="text-lg font-medium text-white">{t("withdraw.processingText")}</p>
+                  <p className="text-sm text-muted-foreground">{t("withdraw.processingDesc")}</p>
                 </div>
               </motion.div>
             )}
@@ -164,21 +166,21 @@ export function WithdrawModal({ investment, isOpen, onClose }: WithdrawModalProp
                   <CheckCircle2 className="w-10 h-10 text-primary" />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-bold font-display text-white">Sent to your PIX!</h3>
-                  <p className="text-muted-foreground">Funds have been unstaked and converted.</p>
+                  <h3 className="text-2xl font-bold font-display text-white">{t("withdraw.sentToPix")}</h3>
+                  <p className="text-muted-foreground">{t("withdraw.fundsUnstaked")}</p>
                 </div>
                 <div className="w-full bg-white/5 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Amount Sent</span>
+                    <span className="text-muted-foreground">{t("withdraw.amountSent")}</span>
                     <span className="font-mono text-primary font-bold text-lg">R$ {summary?.netBrl || netBrl.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Fee Charged</span>
+                    <span className="text-muted-foreground">{t("withdraw.feeCharged")}</span>
                     <span className="font-mono text-muted-foreground">${summary?.feeUsd || fee.toFixed(2)}</span>
                   </div>
                 </div>
                 <Button onClick={handleClose} className="w-full h-12 font-bold bg-white/10 hover:bg-white/20 cursor-pointer" data-testid="button-close-withdraw">
-                  Return to Investments
+                  {t("withdraw.returnInvestments")}
                 </Button>
               </motion.div>
             )}

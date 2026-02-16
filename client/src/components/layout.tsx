@@ -1,26 +1,31 @@
-import { PieChart, ArrowLeftRight, Settings, Bell, Menu, X, Home, LogOut, Wallet } from "lucide-react";
+import { PieChart, ArrowLeftRight, Settings, Bell, Menu, X, Home, LogOut, Wallet, Globe } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
+import { useTranslation, LANG_LABELS, type Language } from "@/lib/i18n";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { t, language, setLanguage } = useTranslation();
 
   const navItems = [
-    { icon: Home, label: "Dashboard", href: "/" },
-    { icon: PieChart, label: "Investments", href: "/investments" },
-    { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
-    { icon: Settings, label: "Settings", href: "/settings" },
+    { icon: Home, labelKey: "nav.dashboard", href: "/" },
+    { icon: PieChart, labelKey: "nav.investments", href: "/investments" },
+    { icon: ArrowLeftRight, labelKey: "nav.transactions", href: "/transactions" },
+    { icon: Settings, labelKey: "nav.settings", href: "/settings" },
   ];
 
   const initials = user?.displayName
     ? user.displayName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
     : user?.username?.slice(0, 2).toUpperCase() || "U";
+
+  const langFlags: Record<Language, string> = { en: "EN", es: "ES", pt: "BR" };
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans relative overflow-hidden">
@@ -41,15 +46,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navItems.map((item) => (
             <Link key={item.href} href={item.href}>
-              <div className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group cursor-pointer", location === item.href ? "bg-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")} data-testid={`nav-${item.label.toLowerCase()}`}>
+              <div className={cn("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group cursor-pointer", location === item.href ? "bg-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")} data-testid={`nav-${item.labelKey.split('.')[1]}`}>
                 <item.icon className={cn("w-5 h-5 transition-colors", location === item.href ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium">{t(item.labelKey)}</span>
               </div>
             </Link>
           ))}
         </nav>
 
         <div className="p-4 border-t border-white/5 space-y-2">
+          <div className="relative">
+            <button
+              onClick={() => setLangMenuOpen(!langMenuOpen)}
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-white/5 cursor-pointer"
+              data-testid="button-language-switcher"
+            >
+              <Globe className="w-4 h-4" />
+              <span>{langFlags[language]} {LANG_LABELS[language]}</span>
+            </button>
+            {langMenuOpen && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-white/10 rounded-xl overflow-hidden shadow-xl z-50">
+                {(["en", "es", "pt"] as Language[]).map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => { setLanguage(lang); setLangMenuOpen(false); }}
+                    className={cn("w-full px-4 py-3 text-sm text-left hover:bg-white/5 transition-colors flex items-center gap-2 cursor-pointer", language === lang && "text-primary bg-primary/5")}
+                    data-testid={`button-lang-${lang}`}
+                  >
+                    <span className="font-bold text-xs w-6">{langFlags[lang]}</span>
+                    <span>{LANG_LABELS[lang]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
             <Avatar className="w-10 h-10 border border-white/10">
               <AvatarFallback className="bg-primary/20 text-primary font-bold">{initials}</AvatarFallback>
@@ -61,7 +91,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <button onClick={logout} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-white/5 cursor-pointer" data-testid="button-logout">
             <LogOut className="w-4 h-4" />
-            <span>Log Out</span>
+            <span>{t("nav.logOut")}</span>
           </button>
         </div>
       </aside>
@@ -74,13 +104,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <span className="font-display font-bold text-lg">DeFi Direct</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-            <Bell className="w-5 h-5" />
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => setLangMenuOpen(!langMenuOpen)}>
+            <Globe className="w-5 h-5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </Button>
         </div>
+        {langMenuOpen && (
+          <div className="absolute top-16 right-4 bg-card border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 min-w-[160px]">
+            {(["en", "es", "pt"] as Language[]).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => { setLanguage(lang); setLangMenuOpen(false); }}
+                className={cn("w-full px-4 py-3 text-sm text-left hover:bg-white/5 transition-colors flex items-center gap-2 cursor-pointer", language === lang && "text-primary bg-primary/5")}
+              >
+                <span className="font-bold text-xs w-6">{langFlags[lang]}</span>
+                <span>{LANG_LABELS[lang]}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {isMobileMenuOpen && (
@@ -90,14 +134,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link key={item.href} href={item.href}>
                 <div className={cn("flex items-center gap-3 px-4 py-4 rounded-xl transition-all", location === item.href ? "bg-primary/10 text-primary border border-primary/20" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")} onClick={() => setIsMobileMenuOpen(false)}>
                   <item.icon className="w-5 h-5" />
-                  <span className="font-medium text-lg">{item.label}</span>
+                  <span className="font-medium text-lg">{t(item.labelKey)}</span>
                 </div>
               </Link>
             ))}
             <div className="pt-4 border-t border-white/5">
               <button onClick={logout} className="flex items-center gap-3 px-4 py-4 text-destructive hover:bg-white/5 rounded-xl w-full cursor-pointer">
                 <LogOut className="w-5 h-5" />
-                <span className="font-medium text-lg">Log Out</span>
+                <span className="font-medium text-lg">{t("nav.logOut")}</span>
               </button>
             </div>
           </nav>
@@ -116,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link key={item.href} href={item.href}>
               <div className={cn("flex flex-col items-center gap-1 p-2 rounded-lg transition-colors", location === item.href ? "text-primary" : "text-muted-foreground")}>
                 <item.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium">{t(item.labelKey)}</span>
               </div>
             </Link>
           ))}

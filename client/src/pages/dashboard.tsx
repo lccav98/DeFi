@@ -8,15 +8,11 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import type { Transaction, Investment } from "@shared/schema";
-
-const PLANS = [
-  { id: "plan-3", duration: "3 Months", apy: "8.5%", risk: "Low", min: 50 },
-  { id: "plan-6", duration: "6 Months", apy: "12.5%", risk: "Medium", min: 100, recommended: true },
-  { id: "plan-12", duration: "12 Months", apy: "18.2%", risk: "Medium-High", min: 500 },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalPortfolioValue: number;
@@ -32,6 +28,12 @@ export default function Dashboard() {
     queryKey: ["/api/transactions", user?.id],
     enabled: !!user,
   });
+
+  const PLANS = [
+    { id: "plan-3", duration: t("plans.months3"), apy: "8.5%", risk: t("plans.low"), min: 50 },
+    { id: "plan-6", duration: t("plans.months6"), apy: "12.5%", risk: t("plans.medium"), min: 100, recommended: true },
+    { id: "plan-12", duration: t("plans.months12"), apy: "18.2%", risk: t("plans.mediumHigh"), min: 500 },
+  ];
 
   const chartData = [
     { name: "Jan", value: stats?.totalPortfolioValue ? stats.totalPortfolioValue * 0.6 : 0 },
@@ -52,12 +54,12 @@ export default function Dashboard() {
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-display font-bold text-white" data-testid="text-dashboard-title">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, {user?.displayName || user?.username}. Your portfolio is growing.</p>
+            <h1 className="text-3xl font-display font-bold text-white" data-testid="text-dashboard-title">{t("dashboard.title")}</h1>
+            <p className="text-muted-foreground">{t("dashboard.welcomeBack", { name: user?.displayName || user?.username || "" })}</p>
           </div>
           <div className="flex items-center gap-2 text-sm text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
             <Activity className="w-4 h-4" />
-            <span>Network Status: Optimal</span>
+            <span>{t("dashboard.networkStatus")}</span>
           </div>
         </div>
 
@@ -65,11 +67,11 @@ export default function Dashboard() {
           <Card className="md:col-span-2 glass-panel border-white/5 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-32 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all duration-700" />
             <CardHeader className="relative z-10 pb-2">
-              <CardTitle className="text-muted-foreground font-medium text-sm uppercase tracking-wider">Total Portfolio Value</CardTitle>
+              <CardTitle className="text-muted-foreground font-medium text-sm uppercase tracking-wider">{t("dashboard.totalPortfolio")}</CardTitle>
             </CardHeader>
             <CardContent className="relative z-10">
               {statsLoading ? (
-                <div className="flex items-center gap-2 py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /><span className="text-muted-foreground">Loading...</span></div>
+                <div className="flex items-center gap-2 py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /><span className="text-muted-foreground">{t("dashboard.loading")}</span></div>
               ) : (
                 <>
                   <div className="flex items-baseline gap-2 mb-6">
@@ -103,9 +105,9 @@ export default function Dashboard() {
           <div className="space-y-6">
             <Card className="glass-panel border-white/5 h-full flex flex-col justify-center p-6 space-y-6">
               <div className="space-y-2">
-                <h3 className="text-muted-foreground font-medium text-sm uppercase">Quick Deposit</h3>
-                <p className="text-2xl font-display font-bold text-white">Start Earning</p>
-                <p className="text-sm text-muted-foreground">Automated bridge & stake via PIX</p>
+                <h3 className="text-muted-foreground font-medium text-sm uppercase">{t("dashboard.quickDeposit")}</h3>
+                <p className="text-2xl font-display font-bold text-white">{t("dashboard.startEarning")}</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.automatedBridge")}</p>
               </div>
               <DepositModal />
             </Card>
@@ -114,15 +116,15 @@ export default function Dashboard() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-bold">Yield Opportunities</h2>
+            <h2 className="text-xl font-display font-bold">{t("dashboard.yieldOpportunities")}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {PLANS.map((plan) => (
               <motion.div key={plan.id} whileHover={{ y: -5 }} className={cn("relative p-6 rounded-xl border transition-all duration-300 cursor-pointer overflow-hidden", plan.recommended ? "bg-gradient-to-br from-card to-card/50 border-primary/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-card/40 border-white/5 hover:border-white/10")}>
-                {plan.recommended && <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-xl">RECOMMENDED</div>}
+                {plan.recommended && <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-xl">{t("dashboard.recommended")}</div>}
                 <div className="space-y-4">
                   <div>
-                    <span className="text-muted-foreground text-sm">Duration</span>
+                    <span className="text-muted-foreground text-sm">{t("dashboard.duration")}</span>
                     <h3 className="text-2xl font-bold font-display">{plan.duration}</h3>
                   </div>
                   <div className="flex items-end gap-2">
@@ -130,7 +132,7 @@ export default function Dashboard() {
                     <span className="text-sm text-muted-foreground mb-1">APY</span>
                   </div>
                   <div className="pt-4 border-t border-white/5 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Min. Invest</span>
+                    <span className="text-muted-foreground">{t("dashboard.minInvest")}</span>
                     <span>${plan.min}</span>
                   </div>
                 </div>
@@ -140,15 +142,15 @@ export default function Dashboard() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xl font-display font-bold">Recent Activity</h2>
+          <h2 className="text-xl font-display font-bold">{t("dashboard.recentActivity")}</h2>
           <Card className="glass-panel border-white/5">
             <CardContent className="p-0">
               {txLoading ? (
                 <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
               ) : txs.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p className="text-lg">No transactions yet</p>
-                  <p className="text-sm">Make your first deposit to start earning yield.</p>
+                  <p className="text-lg">{t("dashboard.noTransactions")}</p>
+                  <p className="text-sm">{t("dashboard.firstDeposit")}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-white/5">
@@ -165,7 +167,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-white">${tx.amountUsd} USDT</p>
-                        <p className="text-xs text-muted-foreground capitalize">{tx.status}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{t(`common.status.${tx.status}`)}</p>
                       </div>
                     </div>
                   ))}

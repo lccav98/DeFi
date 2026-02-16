@@ -4,8 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wallet, ArrowRight, Loader2 } from "lucide-react";
+import { Wallet, ArrowRight, Loader2, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation, LANG_LABELS, type Language } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,8 +15,12 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const { login, register } = useAuth();
   const { toast } = useToast();
+  const { t, language, setLanguage } = useTranslation();
+
+  const langFlags: Record<Language, string> = { en: "EN", es: "ES", pt: "BR" };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +33,9 @@ export default function AuthPage() {
       }
     } catch (err: any) {
       toast({
-        title: "Error",
-        description: err.message?.includes("409") ? "Username already exists" : 
-                     err.message?.includes("401") ? "Invalid credentials" : "Something went wrong",
+        title: t("auth.error"),
+        description: err.message?.includes("409") ? t("auth.errorExists") : 
+                     err.message?.includes("401") ? t("auth.errorInvalid") : t("auth.errorGeneric"),
         variant: "destructive",
       });
     } finally {
@@ -44,6 +50,33 @@ export default function AuthPage() {
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-accent/5 blur-[150px]" />
       </div>
 
+      <div className="fixed top-4 right-4 z-50">
+        <div className="relative">
+          <button
+            onClick={() => setLangMenuOpen(!langMenuOpen)}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer"
+            data-testid="button-auth-language"
+          >
+            <Globe className="w-4 h-4" />
+            <span>{langFlags[language]}</span>
+          </button>
+          {langMenuOpen && (
+            <div className="absolute top-full right-0 mt-1 bg-card border border-white/10 rounded-xl overflow-hidden shadow-xl z-50 min-w-[160px]">
+              {(["en", "es", "pt"] as Language[]).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => { setLanguage(lang); setLangMenuOpen(false); }}
+                  className={cn("w-full px-4 py-3 text-sm text-left hover:bg-white/5 transition-colors flex items-center gap-2 cursor-pointer", language === lang && "text-primary bg-primary/5")}
+                >
+                  <span className="font-bold text-xs w-6">{langFlags[lang]}</span>
+                  <span>{LANG_LABELS[lang]}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       <Card className="w-full max-w-md glass-panel border-white/10 relative z-10 overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-accent to-primary animate-gradient" />
         
@@ -55,7 +88,7 @@ export default function AuthPage() {
             <div>
               <h1 className="text-3xl font-display font-bold text-white">DeFi Direct</h1>
               <p className="text-muted-foreground mt-1">
-                {isLogin ? "Welcome back. Sign in to continue." : "Create your account to start earning."}
+                {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
               </p>
             </div>
           </div>
@@ -63,7 +96,7 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="displayName" className="text-muted-foreground">Display Name</Label>
+                <Label htmlFor="displayName" className="text-muted-foreground">{t("auth.displayName")}</Label>
                 <Input
                   id="displayName"
                   placeholder="John Doe"
@@ -76,7 +109,7 @@ export default function AuthPage() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-muted-foreground">Username</Label>
+              <Label htmlFor="username" className="text-muted-foreground">{t("auth.username")}</Label>
               <Input
                 id="username"
                 placeholder="your_username"
@@ -89,7 +122,7 @@ export default function AuthPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-muted-foreground">Password</Label>
+              <Label htmlFor="password" className="text-muted-foreground">{t("auth.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -110,7 +143,7 @@ export default function AuthPage() {
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                 <>
-                  {isLogin ? "Sign In" : "Create Account"}
+                  {isLogin ? t("auth.signIn") : t("auth.createAccountBtn")}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </>
               )}
@@ -124,7 +157,7 @@ export default function AuthPage() {
               onClick={() => setIsLogin(!isLogin)}
               data-testid="button-toggle-auth"
             >
-              {isLogin ? "Don't have an account? Create one" : "Already have an account? Sign in"}
+              {isLogin ? t("auth.noAccount") : t("auth.hasAccount")}
             </button>
           </div>
         </CardContent>
