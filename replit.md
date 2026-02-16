@@ -92,6 +92,14 @@ shared/           # Shared code between client and server
 - **wouter**: Client-side routing
 - **connect-pg-simple**: PostgreSQL session store (available but not actively used yet)
 
+### Internationalization (i18n)
+- **Languages**: English (en), Spanish (es), Brazilian Portuguese (pt)
+- **Implementation**: React context pattern in `client/src/lib/i18n.tsx` with nested translation keys
+- **Persistence**: Language preference stored in localStorage as `defi-direct-lang`
+- **Detection**: Auto-detects browser language on first visit, falls back to English
+- **Coverage**: All pages, modals, navigation, and user-facing text use `t()` translation function
+- **Switcher**: Available in layout sidebar and auth page (globe icon dropdown)
+
 ### Planned Integrations (from requirements, not yet implemented)
 - PIX payment gateway for BRL on-ramp
 - SideShift.ai or similar bridge API for cross-chain transfers
