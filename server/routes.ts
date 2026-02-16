@@ -361,9 +361,26 @@ export async function registerRoutes(
         return res.json({ status: tx.status, transactionId: tx.id });
       }
 
+      if (!tx.amountUsd) {
+        return res.status(400).json({ message: "Transaction has no USD amount" });
+      }
+
+      if (tx.stripePaymentIntentId) {
+        try {
+          const stripe = await getUncachableStripeClient();
+          const pi = await stripe.paymentIntents.retrieve(tx.stripePaymentIntentId);
+          if (pi.status !== "succeeded") {
+            return res.status(400).json({ message: "Payment has not been completed yet" });
+          }
+        } catch (err: any) {
+          console.error(`[pix] Failed to verify Stripe payment for tx ${tx.id}:`, err);
+          return res.status(500).json({ message: "Could not verify payment status" });
+        }
+      }
+
       await storage.updateTransactionStatus(tx.id, "processing", 0);
 
-      executeDepositPipeline(tx.id, tx.amountUsd!, tx.userId).catch((err) => {
+      executeDepositPipeline(tx.id, tx.amountUsd, tx.userId).catch((err) => {
         console.error(`[pipeline] PIX pipeline failed for tx ${tx.id}:`, err);
       });
 

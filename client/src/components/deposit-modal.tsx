@@ -97,13 +97,8 @@ export function DepositModal() {
             setPipelineStarted(true);
             try {
               await apiRequest("POST", `/api/deposit/pix/${transactionId}/confirm`, {});
-            } catch {
-              for (let stage = 0; stage < 4; stage++) {
-                try {
-                  await apiRequest("POST", `/api/transactions/${transactionId}/process`, {});
-                } catch {}
-                if (stage < 3) await new Promise((r) => setTimeout(r, 2500));
-              }
+            } catch (err) {
+              console.error("[pix] Failed to confirm PIX payment:", err);
             }
           }
         } else if (paymentIntent?.status === "canceled" || paymentIntent?.status === "requires_payment_method") {
