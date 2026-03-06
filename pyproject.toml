@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trxbinary-quant-platform"
+version = "0.1.0"
+description = "Safety-first quantitative trading platform scaffold for TRX Binary"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.setuptools]
+packages = ["app"]
