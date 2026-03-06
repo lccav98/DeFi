@@ -1,0 +1,25 @@
+{
+  "timestamp_utc": "2026-03-06T20:53:56.770325+00:00",
+  "official_api": "não confirmado",
+  "official_copy_trading": "não confirmado",
+  "third_party_order_automation_allowed": "não confirmado",
+  "activation_notes": [
+    "Validar em páginas oficiais: termos, FAQ, central de ajuda e portal de desenvolvedor.",
+    "Requer confirmação explícita da plataforma antes de ENABLE_LIVE=true."
+  ],
+  "permissions": [
+    "Sem permissões verificadas de integração oficial neste ambiente offline."
+  ],
+  "limitations": [
+    "Sem confirmação de API oficial pública para envio de ordens.",
+    "Sem confirmação de copy trading oficial habilitável para terceiros."
+  ],
+  "evidences": [
+    {
+      "source": "TRX Binary landing",
+      "url": "https://app.trxbinary.com/cgi-sys/defaultwebpage.cgi",
+      "finding": "Página inicial genérica sem documentação pública de integração nesta auditoria offline."
+    }
+  ],
+  "recommendation": "PAPER_ONLY"
+}
